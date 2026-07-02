@@ -1,6 +1,6 @@
 # BiliManga TECH_STACK
 
-版本：v0.2.0
+版本：v0.3.0
 作者：Codex
 状态：草稿
 最后更新：2026-07-02
@@ -19,6 +19,8 @@
 - keyring：4.1.2（系统密钥环基线）
 - base64：0.22.1（数据库密钥编码）
 - getrandom：0.3.4（数据库密钥生成）
+- rusqlite：0.40.1 + bundled-sqlcipher-vendored-openssl（加密 SQLite）
+- Strawberry Perl：5.42.2.1（Windows 上编译 vendored OpenSSL/SQLCipher 所需）
 
 ## 架构决策
 
@@ -32,7 +34,7 @@ ADR-002：敏感权益链路使用官方网页。
 
 ADR-003：本地数据全库加密。
 
-原因：书库、阅读历史、偏好和账号状态属于隐私数据。密钥由系统密钥环或等价安全存储保护。当前已实现 keyring 保护的数据库密钥基线；真实账号数据写入前仍必须完成 SQLCipher 或等价全库加密验证。
+原因：书库、阅读历史、偏好和账号状态属于隐私数据。密钥由系统密钥环或等价安全存储保护。当前已实现 keyring 保护的数据库密钥基线，并已通过 SQLCipher 实际数据库文件验证：同密钥可读、错误密钥失败、数据库文件头不是明文 SQLite。
 
 ## 模块边界
 

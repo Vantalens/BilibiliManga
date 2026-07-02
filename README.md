@@ -4,9 +4,9 @@ Windows-first desktop MVP for a Bilibili Manga reading workflow.
 
 ## Current Status
 
-This repository currently contains the project baseline, documentation, Tauri + React desktop shell, local library/reader domain logic, security storage baseline, and an internal Windows installer build.
+This repository currently contains the project baseline, documentation, Tauri + React desktop shell, local library/reader domain logic, security storage baseline, SQLCipher encrypted SQLite verification, and an internal Windows installer build.
 
-It is not a complete manga client yet. Real Bilibili Manga interface research, encrypted SQLite validation, updater signing, and real account reading-path verification are still required before this can be treated as a usable daily app.
+It is not a complete manga client yet. Real Bilibili Manga interface research, updater signing, and real account reading-path verification are still required before this can be treated as a usable daily app.
 
 ## Hard Boundaries
 
@@ -23,7 +23,22 @@ It is not a complete manga client yet. Real Bilibili Manga interface research, e
 - Vite 7
 - Vitest
 - Rust
+- SQLCipher-backed SQLite through rusqlite
 - Windows MVP, with cross-platform paths and architecture reserved for macOS/Linux later
+
+## Windows Build Prerequisites
+
+SQLCipher uses vendored OpenSSL on Windows. Install Strawberry Perl before running Rust or Tauri builds:
+
+```powershell
+winget install --id StrawberryPerl.StrawberryPerl --exact
+```
+
+If the current shell was opened before installation, prepend Strawberry Perl to `PATH` for that shell:
+
+```powershell
+$env:Path = 'C:\Strawberry\perl\bin;C:\Strawberry\c\bin;C:\Strawberry\perl\site\bin;' + $env:Path
+```
 
 ## Development
 
@@ -66,4 +81,3 @@ Updater artifacts are disabled until signing material and an HTTPS update endpoi
 - `docs/api-boundaries.md`
 - `docs/release.md`
 - `progress.md`
-

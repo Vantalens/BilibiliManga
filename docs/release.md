@@ -40,3 +40,8 @@ src-tauri/target/release/bundle/nsis/BiliManga_0.1.0_x64-setup.exe
 - 未完成真实接口调研。
 - 未验证加密 SQLite 实际数据库文件。
 
+
+## Windows SQLCipher Build Dependency
+
+- Strawberry Perl 5.42.2.1 is required to build vendored OpenSSL for SQLCipher on Windows.
+- If installed during an active shell session, prepend `C:\Strawberry\perl\bin;C:\Strawberry\c\bin;C:\Strawberry\perl\site\bin` to `PATH` before running `cargo` or `tauri build`.

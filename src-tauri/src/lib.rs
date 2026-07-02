@@ -2,6 +2,7 @@ use serde::Serialize;
 use tauri::Manager;
 
 mod security;
+mod storage;
 
 #[derive(Serialize)]
 struct AppStatus {
@@ -48,9 +49,16 @@ fn storage_security_status() -> security::StorageSecurityStatus {
 }
 
 #[tauri::command]
-fn initialize_secure_storage() -> Result<security::StorageSecurityStatus, String> {
+fn initialize_secure_storage(app: tauri::AppHandle) -> Result<security::StorageSecurityStatus, String> {
     let store = security::SystemSecretStore;
-    security::ensure_database_key(&store).map_err(|error| error.to_string())?;
+    let database_key = security::get_or_create_database_key(&store).map_err(|error| error.to_string())?;
+    let database_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("bilimanga.db");
+    storage::initialize_encrypted_database(&database_path, &database_key)
+        .map_err(|error| error.to_string())?;
     Ok(security::storage_security_status())
 }
 

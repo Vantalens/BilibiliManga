@@ -80,15 +80,21 @@ pub fn storage_security_status() -> StorageSecurityStatus {
     }
 }
 
-pub fn ensure_database_key(store: &impl SecretStore) -> Result<(), SecurityError> {
-    if store.get_secret(SERVICE_NAME, DATABASE_KEY_USER)?.is_some() {
-        return Ok(());
+pub fn get_or_create_database_key(store: &impl SecretStore) -> Result<String, SecurityError> {
+    if let Some(existing) = store.get_secret(SERVICE_NAME, DATABASE_KEY_USER)? {
+        return Ok(existing);
     }
 
     let mut bytes = [0_u8; DATABASE_KEY_BYTES];
     getrandom::fill(&mut bytes).map_err(|error| SecurityError::Random(error.to_string()))?;
     let encoded = STANDARD_NO_PAD.encode(bytes);
-    store.set_secret(SERVICE_NAME, DATABASE_KEY_USER, &encoded)
+    store.set_secret(SERVICE_NAME, DATABASE_KEY_USER, &encoded)?;
+    Ok(encoded)
+}
+
+#[cfg(test)]
+pub fn ensure_database_key(store: &impl SecretStore) -> Result<(), SecurityError> {
+    get_or_create_database_key(store).map(|_| ())
 }
 
 pub fn clear_cache_dir(cache_dir: &Path) -> Result<u64, SecurityError> {
