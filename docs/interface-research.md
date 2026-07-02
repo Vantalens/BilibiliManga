@@ -55,6 +55,13 @@
 - 当前固化：`parseSearchSuggestionsResponse` 只接受 `data` 为字符串数组；非零 `code` 映射为 server error；缺少 `code` 或 data 形态不符映射为 schema error。
 - 失败模式：`https://manga.bilibili.co/twirp/...` 在本机 TLS 握手 EOF；`http://manga.bilibili.co/twirp/...` 返回 empty reply。运行时不得硬编码依赖该裸域成功。
 
+关键词搜索：
+
+- 端点：`POST https://manga.bilibili.com/twirp/comic.v1.Comic/Search?device=pc&platform=web&nov=27`
+- 官方搜索页 JS 请求体：`{"key_word":"有兽焉","page_num":1,"page_size":10}`。
+- 搜索页 JS 响应模型包含 `list`、`total_page`、`total_num`。
+- 当前本机复核：带 `x-bili-manga-from` 和不带该 header 两种方式均返回 `{"code":99,"msg":"请求失败,请稍后重试。"}`。
+- 当前固化：`SEARCH-KEYWORD-TWIRP` 标记为 `verificationStatus=failed`，不得进入真实 adapter 调用；继续使用官方搜索页作为降级路径。
 ## 详情页观察
 
 观察时间：2026-07-02。
@@ -90,7 +97,7 @@
 | 扫码登录 | 未开始 | 二维码获取、轮询、登录态保存、过期 | 官方网页登录页 |
 | 书架 | 已观察方法名 | 请求体、分页、排序、异常状态、真实响应字段 | 官方网页版书架 |
 | 阅读历史 | 已观察方法名 | 最近阅读、进度字段、同步方向、真实响应字段 | 本地最近阅读 |
-| 搜索 | 部分开始 | 搜索建议响应 schema、关键词搜索、分页、空结果、限流 | 官方搜索页 |
+| 搜索 | 搜索建议已验证；关键词 Search 请求字段已确认但裸调失败 | 关键词搜索成功响应 schema、分页、空结果、限流 | 官方搜索页 |
 | 漫画详情 | 已观察方法名，裸调失败 | `ComicDetail` 请求体、上下文、标题、作者、简介、封面、状态 | 官方详情页 |
 | 章节列表 | 详情页 JS 已观察相关字段，接口未验证 | 章节 ID、顺序、付费状态、是否需要登录上下文 | 官方详情页 |
 | 章节图片 | 已观察 `GetImageIndex`/`ImageToken` 方法名 | 图片 URL、尺寸、鉴权、失败、缓存限制 | 显示错误页 |

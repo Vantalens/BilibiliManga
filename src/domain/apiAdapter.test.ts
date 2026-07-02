@@ -8,6 +8,7 @@ import {
   buildTwirpUrl,
   getBlockedNativeEndpoints,
   getBlockedTwirpEndpoints,
+  getVerifiedTwirpEndpoints,
   observedOfficialJsTwirpBaseUrl,
   observedTwirpEndpoints,
   parseSearchSuggestionsResponse,
@@ -62,6 +63,15 @@ describe("api adapter boundaries", () => {
     );
   });
 
+  it("separates verified public endpoints from observed but failed endpoints", () => {
+    const verifiedIds = getVerifiedTwirpEndpoints(observedTwirpEndpoints).map((endpoint) => endpoint.id);
+    const search = observedTwirpEndpoints.find((endpoint) => endpoint.id === "SEARCH-KEYWORD-TWIRP");
+
+    expect(verifiedIds).toContain("SEARCH-SUGGESTION");
+    expect(verifiedIds).not.toContain("SEARCH-KEYWORD-TWIRP");
+    expect(search?.verificationStatus).toBe("failed");
+    expect(search?.verificationNote).toMatch(/code=99/);
+  });
   it("builds native twirp urls only for allowed observed endpoints", () => {
     const search = observedTwirpEndpoints.find((endpoint) => endpoint.id === "SEARCH-SUGGESTION");
     const wallet = observedTwirpEndpoints.find((endpoint) => endpoint.id === "USER-WALLET");

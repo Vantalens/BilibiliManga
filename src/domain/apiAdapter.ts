@@ -21,6 +21,7 @@ export interface ApiResearchItem {
 }
 
 export type HttpMethod = "POST";
+export type EndpointVerificationStatus = "observed" | "verified" | "failed";
 
 export interface ObservedTwirpEndpoint {
   id: string;
@@ -32,6 +33,8 @@ export interface ObservedTwirpEndpoint {
   observedAt: string;
   nativeImplementationAllowed: boolean;
   officialWebFallback: string;
+  verificationStatus?: EndpointVerificationStatus;
+  verificationNote?: string;
 }
 
 export type ApiAdapterErrorKind = "transport" | "server" | "schema" | "blocked";
@@ -142,7 +145,9 @@ export const observedTwirpEndpoints: ObservedTwirpEndpoint[] = [
     source: "official-pc-js",
     observedAt: "2026-07-02",
     nativeImplementationAllowed: true,
-    officialWebFallback: "官方搜索页"
+    officialWebFallback: "官方搜索页",
+    verificationStatus: "verified",
+    verificationNote: "POST with term/num returned code=0 and string-array data"
   },
   {
     id: "DETAIL-COMIC",
@@ -164,7 +169,9 @@ export const observedTwirpEndpoints: ObservedTwirpEndpoint[] = [
     source: "official-pc-js",
     observedAt: "2026-07-02",
     nativeImplementationAllowed: true,
-    officialWebFallback: "官方搜索页"
+    officialWebFallback: "官方搜索页",
+    verificationStatus: "failed",
+    verificationNote: "Official search page JS uses key_word/page_num/page_size, but direct public POST returned code=99"
   },
   {
     id: "IMAGE-INDEX",
@@ -281,6 +288,12 @@ export function getBlockedTwirpEndpoints(
   endpoints: ObservedTwirpEndpoint[]
 ): ObservedTwirpEndpoint[] {
   return endpoints.filter((endpoint) => !endpoint.nativeImplementationAllowed);
+}
+
+export function getVerifiedTwirpEndpoints(
+  endpoints: ObservedTwirpEndpoint[]
+): ObservedTwirpEndpoint[] {
+  return endpoints.filter((endpoint) => endpoint.nativeImplementationAllowed && endpoint.verificationStatus === "verified");
 }
 
 export function assertTwirpEndpointAllowed(endpoint: ObservedTwirpEndpoint): void {
