@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-ssr/
+target/
+src-tauri/target/
+.vite/
+.superpowers/
+coverage/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+*.key
+.env
+.env.*
+!.env.example
+

@@ -1,0 +1,308 @@
+:root {
+  color-scheme: light dark;
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  background: #f5f6f8;
+  color: #1d2430;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 1024px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #d3d8e0;
+  background: #ffffff;
+  color: #1d2430;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+button.active,
+button:hover {
+  border-color: #00a1d6;
+  color: #0077a3;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.app--immersive {
+  display: block;
+  background: #111418;
+}
+
+.sidebar {
+  border-right: 1px solid #dfe3ea;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.brand__mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background: #00a1d6;
+  color: white;
+  font-weight: 700;
+}
+
+.brand h1,
+.brand p,
+.toolbar h2,
+.toolbar p,
+.reader-header h2,
+.reader-header p {
+  margin: 0;
+}
+
+.brand p,
+.eyebrow {
+  color: #647184;
+  font-size: 12px;
+}
+
+.nav {
+  display: grid;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.nav__item {
+  text-align: left;
+}
+
+.nav__item--active {
+  border-color: #00a1d6;
+  background: #eefaff;
+}
+
+.status-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 28px;
+  padding: 14px;
+  border: 1px solid #dfe3ea;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+
+.status-panel span {
+  color: #647184;
+}
+
+.workspace {
+  padding: 20px;
+}
+
+.toolbar,
+.reader-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.toolbar__actions,
+.reader-header__actions,
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.app--immersive .content-grid {
+  display: block;
+}
+
+.library-pane,
+.reader-pane {
+  border: 1px solid #dfe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.app--immersive .reader-pane {
+  min-height: 100vh;
+  border: 0;
+  border-radius: 0;
+  background: #111418;
+  color: #edf2f7;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.metric {
+  padding: 12px;
+  border-radius: 6px;
+  background: #f2f5f8;
+}
+
+.metric span,
+.search span {
+  display: block;
+  color: #647184;
+  font-size: 12px;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+}
+
+.search {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0;
+}
+
+.search input {
+  width: 100%;
+  border: 1px solid #d3d8e0;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.library-list {
+  display: grid;
+  gap: 8px;
+}
+
+.library-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e4e8ef;
+  border-radius: 6px;
+}
+
+.library-item h3,
+.library-item p {
+  margin: 0;
+}
+
+.library-item p {
+  margin-top: 4px;
+  color: #647184;
+  font-size: 13px;
+}
+
+.scroll-reader {
+  display: grid;
+  gap: 14px;
+}
+
+.page-reader {
+  display: grid;
+  gap: 14px;
+}
+
+.reader-page {
+  display: grid;
+  align-content: center;
+  min-height: 520px;
+  padding: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #273142, #4b5a70);
+  color: #ffffff;
+}
+
+.reader-page span {
+  color: #b8c4d6;
+}
+
+.reader-page strong {
+  margin-top: 8px;
+  font-size: 30px;
+}
+
+.reader-page p {
+  max-width: 520px;
+  color: #dce4ef;
+}
+
+.pager {
+  justify-content: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    background: #161a20;
+    color: #edf2f7;
+  }
+
+  .sidebar,
+  .library-pane,
+  .reader-pane,
+  button,
+  .status-panel {
+    background: #1f252d;
+    color: #edf2f7;
+    border-color: #333d4a;
+  }
+
+  .metric,
+  .nav__item--active {
+    background: #273142;
+  }
+
+  .search input,
+  .library-item {
+    background: #161a20;
+    color: #edf2f7;
+    border-color: #333d4a;
+  }
+}
+
+
+.system-message {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #eef7fb;
+  color: #26657a;
+  font-size: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .system-message {
+    background: #1c3540;
+    color: #b9e7f5;
+  }
+}
