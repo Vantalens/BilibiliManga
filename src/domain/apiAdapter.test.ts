@@ -43,11 +43,22 @@ describe("api adapter boundaries", () => {
       expect.arrayContaining([
         "/bookshelf.v1.Bookshelf/ListFavorite",
         "/bookshelf.v1.Bookshelf/ListHistory",
-        "/comic.v1.Comic/SearchSug"
+        "/comic.v1.Comic/SearchSug",
+        "/comic.v1.Comic/ComicDetail",
+        "/comic.v1.Comic/GetImageIndex",
+        "/comic.v1.Comic/ImageToken"
       ])
     );
     expect(blocked.map((endpoint) => endpoint.id)).toEqual(
-      expect.arrayContaining(["USER-WALLET", "USER-CARD-INFO"])
+      expect.arrayContaining([
+        "USER-WALLET",
+        "USER-CARD-INFO",
+        "EPISODE-BUY-INFO",
+        "EPISODE-BUY",
+        "EPISODE-RENT",
+        "PAY-CREATE-ORDER",
+        "PAY-BCOIN"
+      ])
     );
   });
 
@@ -58,6 +69,20 @@ describe("api adapter boundaries", () => {
     expect(buildTwirpUrl(search!)).toBe(`${twirpBaseUrl}/comic.v1.Comic/SearchSug`);
     expect(() => assertTwirpEndpointAllowed(wallet!)).toThrow(/official web fallback/);
     expect(() => buildTwirpUrl(wallet!)).toThrow(/official web fallback/);
+  });
+
+  it("keeps detail page purchase and payment endpoints blocked", () => {
+    const blockedIds = getBlockedTwirpEndpoints(observedTwirpEndpoints).map((endpoint) => endpoint.id);
+    const detail = observedTwirpEndpoints.find((endpoint) => endpoint.id === "DETAIL-COMIC");
+    const imageIndex = observedTwirpEndpoints.find((endpoint) => endpoint.id === "IMAGE-INDEX");
+    const buy = observedTwirpEndpoints.find((endpoint) => endpoint.id === "EPISODE-BUY");
+    const pay = observedTwirpEndpoints.find((endpoint) => endpoint.id === "PAY-CREATE-ORDER");
+
+    expect(blockedIds).toEqual(expect.arrayContaining(["EPISODE-BUY", "PAY-CREATE-ORDER"]));
+    expect(() => assertTwirpEndpointAllowed(detail!)).not.toThrow();
+    expect(() => assertTwirpEndpointAllowed(imageIndex!)).not.toThrow();
+    expect(() => buildTwirpUrl(buy!)).toThrow(/official web fallback/);
+    expect(() => buildTwirpUrl(pay!)).toThrow(/official web fallback/);
   });
 });
 

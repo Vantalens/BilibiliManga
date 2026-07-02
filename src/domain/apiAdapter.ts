@@ -145,6 +145,105 @@ export const observedTwirpEndpoints: ObservedTwirpEndpoint[] = [
     officialWebFallback: "官方搜索页"
   },
   {
+    id: "DETAIL-COMIC",
+    area: "detail",
+    path: "/comic.v1.Comic/ComicDetail",
+    method: "POST",
+    requiresLogin: false,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: true,
+    officialWebFallback: "官方详情页"
+  },
+  {
+    id: "SEARCH-KEYWORD-TWIRP",
+    area: "search",
+    path: "/comic.v1.Comic/Search",
+    method: "POST",
+    requiresLogin: false,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: true,
+    officialWebFallback: "官方搜索页"
+  },
+  {
+    id: "IMAGE-INDEX",
+    area: "image",
+    path: "/comic.v1.Comic/GetImageIndex",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: true,
+    officialWebFallback: "章节错误页"
+  },
+  {
+    id: "IMAGE-TOKEN",
+    area: "image",
+    path: "/comic.v1.Comic/ImageToken",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: true,
+    officialWebFallback: "章节错误页"
+  },
+  {
+    id: "EPISODE-BUY-INFO",
+    area: "entitlement",
+    path: "/comic.v1.Comic/GetEpisodeBuyInfo",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: false,
+    officialWebFallback: "官方章节购买或解锁页"
+  },
+  {
+    id: "EPISODE-BUY",
+    area: "entitlement",
+    path: "/comic.v1.Comic/BuyEpisode",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: false,
+    officialWebFallback: "官方章节购买页"
+  },
+  {
+    id: "EPISODE-RENT",
+    area: "entitlement",
+    path: "/comic.v1.Comic/RentEpisode",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: false,
+    officialWebFallback: "官方章节限免或租借页"
+  },
+  {
+    id: "PAY-CREATE-ORDER",
+    area: "entitlement",
+    path: "/pay.v1.Pay/CreateOrder",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: false,
+    officialWebFallback: "官方支付页"
+  },
+  {
+    id: "PAY-BCOIN",
+    area: "entitlement",
+    path: "/pay.v1.Pay/PayBCoin",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: false,
+    officialWebFallback: "官方支付页"
+  },
+  {
     id: "USER-WALLET",
     area: "entitlement",
     path: "/user.v1.User/GetWallet",

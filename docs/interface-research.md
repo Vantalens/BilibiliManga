@@ -55,6 +55,23 @@
 - 当前固化：`parseSearchSuggestionsResponse` 只接受 `data` 为字符串数组；非零 `code` 映射为 server error；缺少 `code` 或 data 形态不符映射为 schema error。
 - 失败模式：`https://manga.bilibili.co/twirp/...` 在本机 TLS 握手 EOF；`http://manga.bilibili.co/twirp/...` 返回 empty reply。运行时不得硬编码依赖该裸域成功。
 
+## 详情页观察
+
+观察时间：2026-07-02。
+
+公开来源：
+
+- `https://manga.bilibili.com/detail/mc33354`
+- `https://s1.hdslb.com/bfs/manga-static/manga-pc/static/js/detail.5ef82910de.js`
+
+确认事实：
+
+- PC 详情页仍使用旧版 `manga-pc` Vue 包，页面注释显示 build time `2026-06-15 16:17:27`、version `1.20.18`。
+- 详情页 HTML 不直接注入详情 SSR 数据，只加载 `vendors.2a7240b158.js`、`bili.a839caa9f3.js`、`detail.5ef82910de.js`。
+- 详情页 JS 观察到读类/待验证端点：`/comic.v1.Comic/ComicDetail`、`/comic.v1.Comic/Search`、`/comic.v1.Comic/GetImageIndex`、`/comic.v1.Comic/ImageToken`。
+- 详情页 JS 观察到必须阻断的敏感端点：`/comic.v1.Comic/BuyEpisode`、`/comic.v1.Comic/RentEpisode`、`/comic.v1.Comic/GetEpisodeBuyInfo`、`/pay.v1.Pay/CreateOrder`、`/pay.v1.Pay/PayBCoin`、`/pay.v1.Pay/CreateCardOrder`、`/pay.v1.Pay/GetBCoin`、`/card.v1.Card/GetCardOrders`、`/user.v1.User/GetPayOrders`。
+- 使用公开首页中出现的 `comic_id` 直接请求 `POST https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail?device=pc&platform=web&nov=27`，尝试 `comic_id`、`comicId`、`id`、`season_id`、`seasonId`、`mc_id` 字段均返回 `{"code":99,"msg":"请求失败,请稍后重试。"}`。
+- 当前结论：`ComicDetail` 方法名已观察，但请求体或上下文未验证成功，不能进入真实 adapter 调用；章节图片 `GetImageIndex`/`ImageToken` 必须等权益状态和真实章节路径验证后才能实现。
 ## 已观察 Twirp 方法
 
 | 模块 | 方法 | 登录要求 | 原生允许 | 降级路径 | 状态 |
@@ -74,9 +91,9 @@
 | 书架 | 已观察方法名 | 请求体、分页、排序、异常状态、真实响应字段 | 官方网页版书架 |
 | 阅读历史 | 已观察方法名 | 最近阅读、进度字段、同步方向、真实响应字段 | 本地最近阅读 |
 | 搜索 | 部分开始 | 搜索建议响应 schema、关键词搜索、分页、空结果、限流 | 官方搜索页 |
-| 漫画详情 | 未开始 | 标题、作者、简介、封面、状态 | 官方详情页 |
-| 章节列表 | 未开始 | 章节 ID、顺序、付费状态 | 官方详情页 |
-| 章节图片 | 未开始 | 图片 URL、尺寸、鉴权、失败 | 显示错误页 |
+| 漫画详情 | 已观察方法名，裸调失败 | `ComicDetail` 请求体、上下文、标题、作者、简介、封面、状态 | 官方详情页 |
+| 章节列表 | 详情页 JS 已观察相关字段，接口未验证 | 章节 ID、顺序、付费状态、是否需要登录上下文 | 官方详情页 |
+| 章节图片 | 已观察 `GetImageIndex`/`ImageToken` 方法名 | 图片 URL、尺寸、鉴权、失败、缓存限制 | 显示错误页 |
 | 进度同步 | 未开始 | 上传/读取进度、冲突策略 | 本地进度 |
 | 未解锁状态 | 未开始 | 状态识别、提示文案 | 官方购买页 |
 

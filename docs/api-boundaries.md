@@ -24,3 +24,8 @@
 
 敏感链路统一打开官方网页。客户端只在用户返回后刷新状态，不构造支付或权益变更请求。
 
+## 详情页新增阻断
+
+2026-07-02 从官方详情页 JS 观察到支付、订单、购买、租借和钱包相关 Twirp 方法。
+
+必须保持原生阻断：/comic.v1.Comic/BuyEpisode、/comic.v1.Comic/RentEpisode、/comic.v1.Comic/GetEpisodeBuyInfo、/pay.v1.Pay/CreateOrder、/pay.v1.Pay/PayBCoin、/pay.v1.Pay/CreateCardOrder、/pay.v1.Pay/GetBCoin、/card.v1.Card/GetCardOrders、/user.v1.User/GetPayOrders。
