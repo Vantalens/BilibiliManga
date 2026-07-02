@@ -2,16 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import {
   clearImageCache,
   getStorageSecurityStatus,
+  getStoredReadingProgress,
   initializeSecureStorage,
+  listStoredLibraryItems,
   openOfficialMangaPage,
-  type StorageSecurityStatus
+  upsertStoredLibraryItem,
+  upsertStoredReadingProgress,
+  type StorageSecurityStatus,
+  type StoredLibraryItem
 } from "./bridge/tauriBridge";
-import { filterLibraryItems, summarizeLibrary } from "./domain/library";
+import { filterLibraryItems, summarizeLibrary, type LibraryItem } from "./domain/library";
 import { getNextPageIndex, getPreviousPageIndex } from "./domain/reader";
 import { sampleLibraryItems, sampleReaderPages } from "./sampleData";
 import "./styles.css";
 
 type ReaderMode = "scroll" | "page";
+
+const progressId = "star-sea:chapter-12";
 
 export default function App() {
   const [query, setQuery] = useState("");
@@ -20,27 +27,67 @@ export default function App() {
   const [immersive, setImmersive] = useState(false);
   const [storageStatus, setStorageStatus] = useState<StorageSecurityStatus | null>(null);
   const [systemMessage, setSystemMessage] = useState("安全存储尚未初始化");
+  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>(sampleLibraryItems);
 
   const filteredItems = useMemo(
-    () => filterLibraryItems(sampleLibraryItems, { query }),
-    [query]
+    () => filterLibraryItems(libraryItems, { query }),
+    [libraryItems, query]
   );
-  const summary = useMemo(() => summarizeLibrary(sampleLibraryItems), []);
+  const summary = useMemo(() => summarizeLibrary(libraryItems), [libraryItems]);
 
   useEffect(() => {
     getStorageSecurityStatus()
       .then((status) => setStorageStatus(status))
-      .catch(() => setSystemMessage("当前运行环境无法读取 Tauri 安全状态"));
+      .catch(() => setSystemMessage("当前运行环境无法读取 Tauri 安全状态，正在使用前端示例数据"));
   }, []);
 
   async function initializeStorage() {
     try {
       const status = await initializeSecureStorage();
       setStorageStatus(status);
-      setSystemMessage("系统密钥环已准备数据库密钥");
+      await seedSampleLibrary();
+      await loadPersistedLibrary();
+      const progress = await getStoredReadingProgress(progressId);
+      if (progress) {
+        setPageIndex(progress.page_index);
+        setReaderMode(progress.mode);
+      }
+      setSystemMessage("SQLCipher 数据库已初始化，书库和阅读进度将写入本地加密存储");
     } catch (error) {
       setSystemMessage(`安全存储初始化失败：${String(error)}`);
     }
+  }
+
+  async function seedSampleLibrary() {
+    const now = Date.now();
+    for (const item of sampleLibraryItems) {
+      const stored: StoredLibraryItem = {
+        id: item.id,
+        title: item.title,
+        rating: item.rating,
+        created_at: now,
+        updated_at: now
+      };
+      await upsertStoredLibraryItem(stored);
+    }
+  }
+
+  async function loadPersistedLibrary() {
+    const stored = await listStoredLibraryItems();
+    if (stored.length === 0) {
+      return;
+    }
+
+    setLibraryItems(
+      stored.map((item) => ({
+        id: item.id,
+        title: item.title,
+        rating: item.rating,
+        groups: ["本地加密库"],
+        tags: ["SQLCipher"],
+        unreadChapters: 0
+      }))
+    );
   }
 
   async function clearCache() {
@@ -50,6 +97,32 @@ export default function App() {
     } catch (error) {
       setSystemMessage(`缓存清理失败：${String(error)}`);
     }
+  }
+
+  async function persistProgress(nextPageIndex: number, nextMode: ReaderMode) {
+    try {
+      await upsertStoredReadingProgress({
+        id: progressId,
+        manga_id: "star-sea",
+        chapter_id: "chapter-12",
+        page_index: nextPageIndex,
+        mode: nextMode,
+        updated_at: Date.now()
+      });
+      setSystemMessage(`阅读进度已写入 SQLCipher：${nextMode} ${nextPageIndex + 1}/${sampleReaderPages.length}`);
+    } catch {
+      setSystemMessage("当前未连接本地加密数据库，阅读进度仅保留在本次界面状态中");
+    }
+  }
+
+  function changeReaderMode(nextMode: ReaderMode) {
+    setReaderMode(nextMode);
+    void persistProgress(pageIndex, nextMode);
+  }
+
+  function goToPage(nextPageIndex: number) {
+    setPageIndex(nextPageIndex);
+    void persistProgress(nextPageIndex, readerMode);
   }
 
   const currentPage = sampleReaderPages[pageIndex];
@@ -87,10 +160,10 @@ export default function App() {
               <h2>书库与阅读器</h2>
             </div>
             <div className="toolbar__actions">
-              <button onClick={() => setReaderMode("scroll")} className={readerMode === "scroll" ? "active" : ""}>
+              <button onClick={() => changeReaderMode("scroll")} className={readerMode === "scroll" ? "active" : ""}>
                 长滚动
               </button>
-              <button onClick={() => setReaderMode("page")} className={readerMode === "page" ? "active" : ""}>
+              <button onClick={() => changeReaderMode("page")} className={readerMode === "page" ? "active" : ""}>
                 分页
               </button>
               <button onClick={initializeStorage}>初始化安全存储</button>
@@ -150,11 +223,11 @@ export default function App() {
               <div className="page-reader">
                 <ReaderPage label={currentPage.label} tone={currentPage.tone} />
                 <div className="pager">
-                  <button onClick={() => setPageIndex(getPreviousPageIndex({ pageIndex, totalPages: sampleReaderPages.length }))}>
+                  <button onClick={() => goToPage(getPreviousPageIndex({ pageIndex, totalPages: sampleReaderPages.length }))}>
                     上一页
                   </button>
                   <span>{pageIndex + 1} / {sampleReaderPages.length}</span>
-                  <button onClick={() => setPageIndex(getNextPageIndex({ pageIndex, totalPages: sampleReaderPages.length }))}>
+                  <button onClick={() => goToPage(getNextPageIndex({ pageIndex, totalPages: sampleReaderPages.length }))}>
                     下一页
                   </button>
                 </div>

@@ -4,7 +4,7 @@ Windows-first desktop MVP for a Bilibili Manga reading workflow.
 
 ## Current Status
 
-This repository currently contains the project baseline, documentation, Tauri + React desktop shell, local library/reader domain logic, security storage baseline, SQLCipher encrypted SQLite verification, and an internal Windows installer build.
+This repository currently contains the project baseline, documentation, Tauri + React desktop shell, local library/reader domain logic, security storage baseline, SQLCipher encrypted SQLite verification, local library/progress persistence, and an internal Windows installer build.
 
 It is not a complete manga client yet. Real Bilibili Manga interface research, updater signing, and real account reading-path verification are still required before this can be treated as a usable daily app.
 

@@ -1,6 +1,6 @@
 # BiliManga progress
 
-版本：v0.3.0
+版本：v0.4.0
 作者：Codex
 状态：草稿
 最后更新：2026-07-02
@@ -15,6 +15,8 @@
 - 已用 TDD 实现 reader/cache/library/entitlement/apiAdapter/releasePolicy 纯逻辑。
 - 已实现 Rust keyring 数据库密钥基线；前端无法读取密钥明文。
 - 已验证 SQLCipher 加密 SQLite 实际数据库文件：同密钥可读、错误密钥失败、文件头不是明文 SQLite。
+- 已将本地书库和阅读进度写入/读取接入 SQLCipher 数据库，并通过 Rust round-trip 测试验证。
+- 已将 UI 的示例书库初始化、读取和分页阅读进度保存接入受控 Tauri storage commands。
 - 已实现受控 `clear_image_cache`，只清理应用图片缓存目录。
 - 已建立 API 边界文档，阻止购买/充值/解锁等敏感链路进入原生 adapter。
 - 已建立 release gate 文档；当前仅支持内测安装包。
@@ -26,9 +28,9 @@
 
 ## Next
 
-- 将真实书库/进度写入已验证的 SQLCipher 数据库。
-- 配置 updater 签名私钥、公钥和 HTTPS 更新源。
 - 开始真实接口调研并填充 `docs/interface-research.md`。
+- 将真实接口返回的书库/进度映射到已验证的 SQLCipher 数据库。
+- 配置 updater 签名私钥、公钥和 HTTPS 更新源。
 - 做真实 Windows GUI 路径验证，包括安装、启动、初始化安全存储、清理缓存、阅读器模式切换。
 
 ## Blockers
