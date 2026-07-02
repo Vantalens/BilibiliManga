@@ -4,13 +4,13 @@ Windows-first desktop MVP for a Bilibili Manga reading workflow.
 
 ## Current Status
 
-This repository currently contains the project baseline, documentation, Tauri + React desktop shell, local library/reader domain logic, security storage baseline, SQLCipher encrypted SQLite verification, local library/progress persistence, and an internal Windows installer build.
+This repository currently contains the project baseline, documentation, Tauri + React desktop shell, local library/reader domain logic, security storage baseline, SQLCipher encrypted SQLite verification, local library/progress persistence, public interface research for search suggestions, and an internal Windows installer build.
 
-It is not a complete manga client yet. Real Bilibili Manga interface research, updater signing, and real account reading-path verification are still required before this can be treated as a usable daily app.
+It is not a complete manga client yet. Real authenticated Bilibili Manga interface research, updater signing, and real account reading-path verification are still required before this can be treated as a usable daily app.
 
 ## Hard Boundaries
 
-- No native implementation of payment, recharge, purchase, unlock, order, coupon, balance, or entitlement-changing flows.
+- No native implementation of payment, recharge, purchase, unlock, order, coupon, balance, wallet, or entitlement-changing flows.
 - Locked or unknown-entitlement chapters must route to the official web flow.
 - No image export, permanent offline package, bulk download, or access-control bypass.
 - Image cache is short-term, capacity/expiry-limited, non-exportable, and clearable.
@@ -25,6 +25,12 @@ It is not a complete manga client yet. Real Bilibili Manga interface research, u
 - Rust
 - SQLCipher-backed SQLite through rusqlite
 - Windows MVP, with cross-platform paths and architecture reserved for macOS/Linux later
+
+## Development Workflow
+
+Before non-trivial changes, follow `docs/github-workflow.md`: inspect `git status -sb`, update code/tests/docs together, run the required verification, commit with a focused message, push to GitHub, and confirm `HEAD` matches `origin/main`.
+
+Interface research must update `docs/interface-research.md` with source, timestamp, request shape, response sample, failure mode, and fallback path. Security boundary changes must update `SECURITY.md` and `docs/api-boundaries.md`.
 
 ## Windows Build Prerequisites
 
@@ -77,7 +83,9 @@ Updater artifacts are disabled until signing material and an HTTPS update endpoi
 - `IMPLEMENTATION_PLAN.md`
 - `TEST_PLAN.md`
 - `SECURITY.md`
+- `AGENT_RULES.md`
 - `docs/interface-research.md`
 - `docs/api-boundaries.md`
+- `docs/github-workflow.md`
 - `docs/release.md`
 - `progress.md`

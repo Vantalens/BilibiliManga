@@ -34,6 +34,25 @@ export interface ObservedTwirpEndpoint {
   officialWebFallback: string;
 }
 
+export type ApiAdapterErrorKind = "transport" | "server" | "schema" | "blocked";
+
+export interface ApiAdapterError {
+  kind: ApiAdapterErrorKind;
+  message: string;
+  code?: number;
+}
+
+export type ApiAdapterResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: ApiAdapterError };
+
+export interface TwirpEnvelope<T> {
+  code: number;
+  msg?: string;
+  message?: string;
+  data: T;
+}
+
 export const apiResearchCatalog: ApiResearchItem[] = [
   {
     id: "AUTH-QR",
@@ -77,7 +96,8 @@ export const apiResearchCatalog: ApiResearchItem[] = [
   }
 ];
 
-export const twirpBaseUrl = "https://manga.bilibili.co/twirp";
+export const observedOfficialJsTwirpBaseUrl = "http://manga.bilibili.co/twirp";
+export const twirpBaseUrl = "https://manga.bilibili.com/twirp";
 
 export const observedTwirpEndpoints: ObservedTwirpEndpoint[] = [
   {
@@ -173,4 +193,88 @@ export function assertTwirpEndpointAllowed(endpoint: ObservedTwirpEndpoint): voi
 export function buildTwirpUrl(endpoint: ObservedTwirpEndpoint): string {
   assertTwirpEndpointAllowed(endpoint);
   return `${twirpBaseUrl}${endpoint.path}`;
+}
+
+export function buildTwirpQuery(params: Record<string, string | number> = {}): string {
+  return new URLSearchParams({ device: "pc", platform: "web", nov: "27", ...stringifyParams(params) }).toString();
+}
+
+export function buildTwirpHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+  return {
+    "content-type": "application/json",
+    "x-bili-manga-from": "c-int-v1",
+    ...extraHeaders
+  };
+}
+
+export function parseSearchSuggestionsResponse(input: unknown): ApiAdapterResult<string[]> {
+  const envelope = parseTwirpEnvelope<unknown>(input);
+  if (!envelope.ok) {
+    return envelope;
+  }
+
+  if (!Array.isArray(envelope.data.data) || !envelope.data.data.every((item) => typeof item === "string")) {
+    return {
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "SearchSug response data must be a string array"
+      }
+    };
+  }
+
+  return { ok: true, data: envelope.data.data };
+}
+
+export function parseTwirpEnvelope<T>(input: unknown): ApiAdapterResult<TwirpEnvelope<T>> {
+  if (!isRecord(input) || typeof input.code !== "number") {
+    return {
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "Twirp response must include a numeric code"
+      }
+    };
+  }
+
+  if (input.code !== 0) {
+    return {
+      ok: false,
+      error: {
+        kind: "server",
+        code: input.code,
+        message: getTwirpMessage(input)
+      }
+    };
+  }
+
+  if (!("data" in input)) {
+    return {
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "Twirp success response must include data"
+      }
+    };
+  }
+
+  return { ok: true, data: input as unknown as TwirpEnvelope<T> };
+}
+
+function stringifyParams(params: Record<string, string | number>): Record<string, string> {
+  return Object.fromEntries(Object.entries(params).map(([key, value]) => [key, String(value)]));
+}
+
+function getTwirpMessage(input: Record<string, unknown>): string {
+  if (typeof input.msg === "string" && input.msg.length > 0) {
+    return input.msg;
+  }
+  if (typeof input.message === "string" && input.message.length > 0) {
+    return input.message;
+  }
+  return "Bilibili Manga API returned a non-zero code";
+}
+
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
 }

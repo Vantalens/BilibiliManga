@@ -36,10 +36,24 @@
 
 - PC 首页是 SSR 页面，meta 中出现 `build-time=2026-06-15 18:04:42（北京时间）` 和 `version=0.3.12`。
 - 首页 SSR 数据包含公开漫画字段：`comic_id`、`title`、`author`、`vertical_cover`、`is_finish`、`last_ord`、`last_short_title`、`styles`、`total`、`fans`、`last_ep`、`allow_wait_free`、`discount_type`、`home_block_jump_value`、`comic_introduction`、`tags`。
-- 公开前端 JS 中观察到 Twirp 基础路径：`https://manga.bilibili.co/twirp`。
+- 公开前端 JS 中观察到 Twirp 基础路径：`http://manga.bilibili.co/twirp`。本机裸请求该域返回 TLS/empty reply 失败；同站代理 `https://manga.bilibili.com/twirp` 可访问，客户端运行时先使用同站 HTTPS 基址。
 - 公开前端 JS 为请求附加查询参数：`device=pc`、`platform=web`、`nov=27`。
 - 公开前端 JS 为请求附加 header：`content-type=application/json`、`x-bili-manga-from=c-int-v1`。
 - 登录状态检查还会访问 B 站主站接口：`https://api.bilibili.com/x/web-interface/nav`，返回 `code=-101` 时前端按未登录处理。
+
+
+## 已验证公开响应
+
+观察时间：2026-07-02。
+
+搜索建议：
+
+- 端点：`POST https://manga.bilibili.com/twirp/comic.v1.Comic/SearchSug?device=pc&platform=web&nov=27`
+- 请求体：`{"term":"有兽焉","num":5}`
+- 请求头：`content-type=application/json`、`x-bili-manga-from=c-int-v1`，并带浏览器 `origin`/`referer` 时返回正常。
+- 响应：HTTP 200，JSON 包络为 `{"code":0,"msg":"","data":["有兽焉"]}`。
+- 当前固化：`parseSearchSuggestionsResponse` 只接受 `data` 为字符串数组；非零 `code` 映射为 server error；缺少 `code` 或 data 形态不符映射为 schema error。
+- 失败模式：`https://manga.bilibili.co/twirp/...` 在本机 TLS 握手 EOF；`http://manga.bilibili.co/twirp/...` 返回 empty reply。运行时不得硬编码依赖该裸域成功。
 
 ## 已观察 Twirp 方法
 
@@ -48,7 +62,7 @@
 | 用户/登录态 | `/user.v1.User/GetNewbieInfo` | 是 | 允许调研 | 官方网页登录页 | 已观察，未真实登录验证 |
 | 书架 | `/bookshelf.v1.Bookshelf/ListFavorite` | 是 | 允许调研 | 官方网页版书架 | 已观察，未真实登录验证 |
 | 阅读历史 | `/bookshelf.v1.Bookshelf/ListHistory` | 是 | 允许调研 | 官方网页版历史 | 已观察，未真实登录验证 |
-| 搜索建议 | `/comic.v1.Comic/SearchSug` | 否 | 允许调研 | 官方搜索页 | 已观察，未做响应 schema 固化 |
+| 搜索建议 | `/comic.v1.Comic/SearchSug` | 否 | 允许调研 | 官方搜索页 | 已验证公开响应 schema |
 | 钱包 | `/user.v1.User/GetWallet` | 是 | 禁止原生实现 | 官方钱包页 | 已阻断 |
 | 用户权益卡 | `/card.v1.Card/GetUserCardInfo` | 是 | 禁止原生实现 | 官方用户权益页 | 已阻断 |
 

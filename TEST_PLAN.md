@@ -1,9 +1,17 @@
 # BiliManga TEST_PLAN
 
-版本：v0.1.0
+版本：v0.2.0
 作者：Codex
 状态：草稿
 最后更新：2026-07-02
+
+## 提交前默认门禁
+
+- `git diff --check`。
+- `npm test`。
+- `npm run build`。
+- 涉及 Rust/Tauri/storage/security 时追加 `cargo test`、`cargo check`、`npm run tauri -- build`。
+- 任何无法运行的验证必须记录阻断原因和未验证风险。
 
 ## 自动化测试
 
@@ -26,7 +34,6 @@
 - 缓存满。
 - 数据库解锁失败。
 - 更新失败。
-
 
 ## 发布阻断
 
