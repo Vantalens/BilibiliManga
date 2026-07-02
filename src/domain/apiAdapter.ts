@@ -20,6 +20,20 @@ export interface ApiResearchItem {
   officialWebFallback: string;
 }
 
+export type HttpMethod = "POST";
+
+export interface ObservedTwirpEndpoint {
+  id: string;
+  area: ApiArea;
+  path: `/${string}`;
+  method: HttpMethod;
+  requiresLogin: boolean;
+  source: "official-pc-js" | "official-pc-ssr";
+  observedAt: string;
+  nativeImplementationAllowed: boolean;
+  officialWebFallback: string;
+}
+
 export const apiResearchCatalog: ApiResearchItem[] = [
   {
     id: "AUTH-QR",
@@ -63,6 +77,77 @@ export const apiResearchCatalog: ApiResearchItem[] = [
   }
 ];
 
+export const twirpBaseUrl = "https://manga.bilibili.co/twirp";
+
+export const observedTwirpEndpoints: ObservedTwirpEndpoint[] = [
+  {
+    id: "USER-NEWBIE-INFO",
+    area: "auth",
+    path: "/user.v1.User/GetNewbieInfo",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: true,
+    officialWebFallback: "官方网页登录页"
+  },
+  {
+    id: "LIBRARY-FAVORITE-LIST",
+    area: "library",
+    path: "/bookshelf.v1.Bookshelf/ListFavorite",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: true,
+    officialWebFallback: "官方网页版书架"
+  },
+  {
+    id: "HISTORY-LIST",
+    area: "history",
+    path: "/bookshelf.v1.Bookshelf/ListHistory",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: true,
+    officialWebFallback: "官方网页版历史"
+  },
+  {
+    id: "SEARCH-SUGGESTION",
+    area: "search",
+    path: "/comic.v1.Comic/SearchSug",
+    method: "POST",
+    requiresLogin: false,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: true,
+    officialWebFallback: "官方搜索页"
+  },
+  {
+    id: "USER-WALLET",
+    area: "entitlement",
+    path: "/user.v1.User/GetWallet",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: false,
+    officialWebFallback: "官方钱包页"
+  },
+  {
+    id: "USER-CARD-INFO",
+    area: "entitlement",
+    path: "/card.v1.Card/GetUserCardInfo",
+    method: "POST",
+    requiresLogin: true,
+    source: "official-pc-js",
+    observedAt: "2026-07-02",
+    nativeImplementationAllowed: false,
+    officialWebFallback: "官方用户权益页"
+  }
+];
+
 export function getBlockedNativeEndpoints(items: ApiResearchItem[]): ApiResearchItem[] {
   return items.filter((item) => !item.nativeImplementationAllowed || item.risk === "blocked");
 }
@@ -73,3 +158,19 @@ export function assertNativeEndpointAllowed(item: ApiResearchItem): void {
   }
 }
 
+export function getBlockedTwirpEndpoints(
+  endpoints: ObservedTwirpEndpoint[]
+): ObservedTwirpEndpoint[] {
+  return endpoints.filter((endpoint) => !endpoint.nativeImplementationAllowed);
+}
+
+export function assertTwirpEndpointAllowed(endpoint: ObservedTwirpEndpoint): void {
+  if (!endpoint.nativeImplementationAllowed) {
+    throw new Error(`${endpoint.id} must use official web fallback: ${endpoint.officialWebFallback}`);
+  }
+}
+
+export function buildTwirpUrl(endpoint: ObservedTwirpEndpoint): string {
+  assertTwirpEndpointAllowed(endpoint);
+  return `${twirpBaseUrl}${endpoint.path}`;
+}

@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   apiResearchCatalog,
   assertNativeEndpointAllowed,
-  getBlockedNativeEndpoints
+  assertTwirpEndpointAllowed,
+  buildTwirpUrl,
+  getBlockedNativeEndpoints,
+  getBlockedTwirpEndpoints,
+  observedTwirpEndpoints,
+  twirpBaseUrl
 } from "./apiAdapter";
 
 describe("api adapter boundaries", () => {
@@ -24,5 +29,28 @@ describe("api adapter boundaries", () => {
 
     expect(() => assertNativeEndpointAllowed(search!)).not.toThrow();
   });
-});
 
+  it("records observed official pc twirp endpoints without enabling sensitive wallet calls", () => {
+    const blocked = getBlockedTwirpEndpoints(observedTwirpEndpoints);
+
+    expect(observedTwirpEndpoints.map((endpoint) => endpoint.path)).toEqual(
+      expect.arrayContaining([
+        "/bookshelf.v1.Bookshelf/ListFavorite",
+        "/bookshelf.v1.Bookshelf/ListHistory",
+        "/comic.v1.Comic/SearchSug"
+      ])
+    );
+    expect(blocked.map((endpoint) => endpoint.id)).toEqual(
+      expect.arrayContaining(["USER-WALLET", "USER-CARD-INFO"])
+    );
+  });
+
+  it("builds native twirp urls only for allowed observed endpoints", () => {
+    const search = observedTwirpEndpoints.find((endpoint) => endpoint.id === "SEARCH-SUGGESTION");
+    const wallet = observedTwirpEndpoints.find((endpoint) => endpoint.id === "USER-WALLET");
+
+    expect(buildTwirpUrl(search!)).toBe(`${twirpBaseUrl}/comic.v1.Comic/SearchSug`);
+    expect(() => assertTwirpEndpointAllowed(wallet!)).toThrow(/official web fallback/);
+    expect(() => buildTwirpUrl(wallet!)).toThrow(/official web fallback/);
+  });
+});
