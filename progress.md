@@ -36,7 +36,6 @@
 - ✅ **新增**：已扩展 Rust API 模块，添加 `QrCodeResult`、`LoginStatus`、`BookshelfItem`、`BookshelfResult` 类型和占位函数。
 - ✅ **新增**：已注册 Tauri 命令：`generate_login_qrcode`、`poll_login_status`、`fetch_user_bookshelf`。
 - ✅ **新增**：已扩展前端 Bridge，添加对应的 TypeScript 类型和调用函数。
-- ✅ **新增**：Rust 编译通过、前端编译通过、前端测试通过（7 files, 26 tests）。
 - ✅ **新增**：已提取官方 B 站客户端的登录页地址（`https://passport.bilibili.com/login`）和架构模式（WebView 登录、混淆代码）。
 
 ## In Progress
@@ -61,14 +60,10 @@
 - 当前未初始化：`mcp__codegraph.codegraph_files` 返回 `CodeGraph not initialized`。
 - 本轮替代检查方式：Git 状态、文件检查、前端测试、Rust 测试、前端构建、Tauri 构建。
 - 进入接口适配器扩展、存储重构或跨模块修改前，应执行 codegraph 初始化。
-## 2026-07-03 重大更新：基于深度研究报告实现真实接口
+## 2026-07-03 接手复核：真实接口状态修正
 
-- ✅ 分析了两份深度研究报告，确认已购漫画接口结构
-- ✅ 实现 check_login_status() - B站主站nav接口检查登录态
-- ✅ 实现 fetch_purchased_comics() - 基于社区文档的已购漫画列表
-- ✅ 完善错误码处理：-101未登录、-6会话过期、99上下文不匹配
-- ✅ 确认鉴权机制：Cookie (SESSDATA)、必需Header和Query参数
-- ✅ 确认图片访问：三段式（GetImageIndex → ImageToken → 带token的URL）
-- ✅ 所有测试通过：cargo check ✓, npm test ✓ (26 tests)
-
-当前完成度：约80%，已购漫画接口已实现，等待真实Cookie验证
+- 已分析两份深度研究报告，将 `GetAutoBuyComics` 降级为候选接口：请求体和响应字段来自报告/社区资料，仍未经过真实 Cookie 浏览器路径验证。
+- 已参考 `0xlau/biliplus`：该项目是 B 站浏览器扩展，不是漫画客户端；可借鉴的是浏览器上下文、后台监听、受控 API 封装方式，不能复制为漫画 API 实现。
+- 已在 `src/domain/apiAdapter.ts` 增加 `USER-PURCHASED-COMICS` 候选端点、请求构造和响应解析；该 domain 层不接触真实 Cookie。
+- 已补充 `GetAutoBuyComics` 请求构造、分页校验、响应 schema、`bug_type` 兼容和异常 schema 测试。
+- 当前真实接口完成度不能声明 80%；可确认的是 `SearchSug` 已验证，`GetAutoBuyComics` 进入候选适配阶段，书架/详情/章节/图片/进度仍待真实账号验证。

@@ -3,6 +3,7 @@ import {
   apiResearchCatalog,
   assertNativeEndpointAllowed,
   assertTwirpEndpointAllowed,
+  buildPurchasedComicsRequest,
   buildTwirpHeaders,
   buildTwirpQuery,
   buildTwirpUrl,
@@ -11,6 +12,7 @@ import {
   getVerifiedTwirpEndpoints,
   observedOfficialJsTwirpBaseUrl,
   observedTwirpEndpoints,
+  parsePurchasedComicsResponse,
   parseSearchSuggestionsResponse,
   parseTwirpEnvelope,
   twirpBaseUrl
@@ -42,6 +44,7 @@ describe("api adapter boundaries", () => {
     expect(observedOfficialJsTwirpBaseUrl).toBe("http://manga.bilibili.co/twirp");
     expect(observedTwirpEndpoints.map((endpoint) => endpoint.path)).toEqual(
       expect.arrayContaining([
+        "/user.v1.User/GetAutoBuyComics",
         "/bookshelf.v1.Bookshelf/ListFavorite",
         "/bookshelf.v1.Bookshelf/ListHistory",
         "/comic.v1.Comic/SearchSug",
@@ -69,6 +72,7 @@ describe("api adapter boundaries", () => {
 
     expect(verifiedIds).toContain("SEARCH-SUGGESTION");
     expect(verifiedIds).not.toContain("SEARCH-KEYWORD-TWIRP");
+    expect(verifiedIds).not.toContain("USER-PURCHASED-COMICS");
     expect(search?.verificationStatus).toBe("failed");
     expect(search?.verificationNote).toMatch(/code=99/);
   });
@@ -145,6 +149,98 @@ describe("twirp request and response parsing", () => {
       error: {
         kind: "schema",
         message: "Twirp response must include a numeric code"
+      }
+    });
+  });
+
+  it("builds the observed purchased comics request without requiring a Cookie value in the domain layer", () => {
+    const result = buildPurchasedComicsRequest(1, 15);
+
+    expect(result).toEqual({
+      ok: true,
+      data: expect.objectContaining({
+        url: "https://manga.bilibili.com/twirp/user.v1.User/GetAutoBuyComics?device=pc&platform=web&nov=27",
+        query: "device=pc&platform=web&nov=27",
+        headers: {
+          "content-type": "application/json",
+          "x-bili-manga-from": "c-int-v1",
+          origin: "https://manga.bilibili.com",
+          referer: "https://manga.bilibili.com/account-center"
+        },
+        body: { page_num: 1, page_size: 15 }
+      })
+    });
+  });
+
+  it("rejects invalid purchased comics pagination before a network request exists", () => {
+    expect(buildPurchasedComicsRequest(0, 15)).toEqual({
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "GetAutoBuyComics page_num must be an integer greater than 0"
+      }
+    });
+    expect(buildPurchasedComicsRequest(1, 51)).toEqual({
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "GetAutoBuyComics page_size must be between 1 and 50"
+      }
+    });
+  });
+
+  it("parses purchased comics from the research-report candidate schema", () => {
+    const result = parsePurchasedComicsResponse({
+      code: 0,
+      msg: "",
+      data: [
+        {
+          id: 11,
+          comic_id: "33354",
+          comic_title: "有兽焉",
+          vcover: "https://example.invalid/cover.jpg",
+          bought_ep_count: 12,
+          last_ord: 45.5,
+          last_short_title: "第45话",
+          bug_type: 2,
+          enable_auto_pay: false,
+          orders: [{ order_id: "redacted" }]
+        }
+      ]
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      data: [
+        {
+          id: 11,
+          comic_id: 33354,
+          comic_title: "有兽焉",
+          vcover: "https://example.invalid/cover.jpg",
+          bought_ep_count: 12,
+          last_ord: 45.5,
+          last_short_title: "第45话",
+          buy_type: 2,
+          enable_auto_pay: false,
+          orders: [{ order_id: "redacted" }]
+        }
+      ]
+    });
+  });
+
+  it("rejects malformed purchased comics data instead of silently accepting it", () => {
+    expect(parsePurchasedComicsResponse({ code: 0, msg: "", data: {} })).toEqual({
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "GetAutoBuyComics response data must be an array"
+      }
+    });
+    expect(parsePurchasedComicsResponse({ code: 0, msg: "", data: [{ comic_id: 1 }] })).toEqual({
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "GetAutoBuyComics item 0 must include comic_id and comic_title"
       }
     });
   });

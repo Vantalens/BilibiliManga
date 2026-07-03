@@ -86,7 +86,7 @@
 | 模块 | 方法 | 登录要求 | 原生允许 | 降级路径 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | 用户/登录态 | `https://api.bilibili.com/x/web-interface/nav` | 是 | 允许调研 | 官方网页登录页 | ✅ 已确认：`code=-101`表示未登录 |
-| 已购漫画 | `/user.v1.User/GetAutoBuyComics` | 是 | 允许调研 | 官方网页 https://manga.bilibili.com/account-center | ✅ 社区文档已确认请求体和响应结构 |
+| 已购漫画 | `/user.v1.User/GetAutoBuyComics` | 是 | 允许调研 | 官方网页 https://manga.bilibili.com/account-center | 候选：本地研究报告和社区资料给出请求体/响应结构，仍需真实 Cookie 验证 |
 | 书架 | `/bookshelf.v1.Bookshelf/ListFavorite` | 是 | 允许调研 | 官方网页版书架 https://manga.bilibili.com/account-center | ✅ RSSHub生产实现已验证：`code=-6`表示Cookie过期 |
 | 阅读历史 | `/bookshelf.v1.Bookshelf/ListHistory` | 是 | 允许调研 | 官方网页版历史 | 结构已就绪，等待真实验证 |
 | 漫画详情 | `/comic.v1.Comic/ComicDetail` | 否/是 | 允许调研 | 官方详情页 https://manga.bilibili.com/detail/mc{id} | 已观察，公开裸调返回`code=99` |
@@ -107,20 +107,20 @@
 | 阅读历史 | 未开始 | ListHistory 请求体、响应字段、时间戳格式 | 官方历史页 https://manga.bilibili.com/account-center/history |
 | 进度同步 | 未开始 | 上报接口（如存在）、频率限制、冲突处理 | 本地优先，不强制同步 |
 
-## 2026-07-03 实现进展（基于深度研究报告）
+## 2026-07-03 状态修正（接手 Claude 代码后复核）
 
-### 已完成结构
+### 已完成结构性工作
 
 1. **深度研究报告分析**
    - 分析了两份详细的接口研究报告
-   - 确认了已购漫画接口 `GetAutoBuyComics` 的请求体和响应结构
+   - 提取了已购漫画接口 `GetAutoBuyComics` 的候选请求体和响应结构；尚未完成真实账号验证
    - 确认了登录检查接口 `https://api.bilibili.com/x/web-interface/nav`
    - 确认了错误码：`-101`未登录，`-6`会话过期，`99`上下文不匹配
 
 2. **Rust API 模块完整实现** (`src-tauri/src/api.rs`)
    - ✅ 新增 `check_login_status()` - 使用 B 站主站 nav 接口检查登录态
-   - ✅ 新增 `fetch_purchased_comics()` - 基于社区文档实现已购漫画列表
-   - ✅ 完善 `fetch_bookshelf()` - 添加 Cookie 验证和错误处理
+   - 新增 `fetch_purchased_comics()` 原型；当前只能视为候选实现，不能作为稳定可用接口声明
+   - `fetch_bookshelf()` 仍是未实现占位，只做 Cookie 入参校验和官方网页降级错误
    - ✅ 新增类型：`LoginCheckResult`、`PurchasedComic`、`PurchasedComicsResult`
    - ✅ 实现错误码处理：`-101`、`-6`、`99` 的特定错误消息
 
@@ -138,7 +138,7 @@
 
 1. **已购漫画接口**：`/user.v1.User/GetAutoBuyComics`
    - 请求体：`{"page_num":1,"page_size":15}`
-   - 响应：直接返回数组，无 `total` 字段，需持续翻页直到空数组
+   - 候选响应：`data` 为数组，无 `total` 字段；分页停止条件推断为返回空数组或长度小于 `page_size`
    - 字段兼容：同时支持 `buy_type` 和 `bug_type`（API 拼写差异）
 
 2. **登录检查**：`https://api.bilibili.com/x/web-interface/nav`
@@ -164,10 +164,9 @@
 
 ### 验证状态
 
-- ✅ Rust 编译通过：`cargo check`
-- ✅ 前端编译通过：`npm run build`
-- ✅ 前端测试通过：26 tests (7 files)
-- ✅ 接口结构已实现，等待真实 Cookie 验证
+- 既有记录显示曾运行过 `cargo check`、`npm run build`、`npm test`；本轮仍需重新运行后才能声明当前工作树通过。
+- `SearchSug` 是当前唯一已验证公开 Twirp 响应 schema。
+- `GetAutoBuyComics` 仅完成 domain 层候选请求构造和响应解析测试；真实 Cookie、浏览器上下文、分页稳定性和失败模式仍未验证。
 
 ### 安全边界确认
 
@@ -213,7 +212,7 @@
 
 ## 当前实现策略
 
-- `apiAdapter` 只记录观察到的端点和安全分类，不直接发起网络请求。
+- `apiAdapter` 记录观察到的端点、安全分类、候选请求构造和响应解析；真实网络调用必须等对应接口完成实测。
 - 允许类端点必须先通过响应 schema 测试和失败模式测试，再接入 Rust/前端 bridge。
 - 钱包、用户权益卡、购买、充值、支付、券、余额、订单和权益变更端点必须保持 `nativeImplementationAllowed=false`。
 - 未解锁章节、未知权益状态和任何权益变更入口统一打开官方网页。

@@ -29,7 +29,7 @@ export interface ObservedTwirpEndpoint {
   path: `/${string}`;
   method: HttpMethod;
   requiresLogin: boolean;
-  source: "official-pc-js" | "official-pc-ssr";
+  source: "official-pc-js" | "official-pc-ssr" | "research-report";
   observedAt: string;
   nativeImplementationAllowed: boolean;
   officialWebFallback: string;
@@ -54,6 +54,35 @@ export interface TwirpEnvelope<T> {
   msg?: string;
   message?: string;
   data: T;
+}
+
+export interface TwirpJsonRequest<TBody extends Record<string, unknown>> {
+  endpoint: ObservedTwirpEndpoint;
+  url: string;
+  query: string;
+  headers: Record<string, string>;
+  body: TBody;
+}
+
+export interface PurchasedComic {
+  comic_id: number;
+  comic_title: string;
+  id?: number;
+  vcover?: string;
+  scover?: string;
+  hcover?: string;
+  bought_ep_count?: number;
+  gold_status?: number;
+  coupon_status?: number;
+  comic_status?: number;
+  last_ord?: number;
+  ctime?: number;
+  last_short_title?: string;
+  buy_type?: number;
+  ep_for_chapters?: unknown[];
+  orders?: unknown[];
+  enable_auto_pay?: boolean;
+  type?: number;
 }
 
 export const apiResearchCatalog: ApiResearchItem[] = [
@@ -113,6 +142,19 @@ export const observedTwirpEndpoints: ObservedTwirpEndpoint[] = [
     observedAt: "2026-07-02",
     nativeImplementationAllowed: true,
     officialWebFallback: "官方网页登录页"
+  },
+  {
+    id: "USER-PURCHASED-COMICS",
+    area: "library",
+    path: "/user.v1.User/GetAutoBuyComics",
+    method: "POST",
+    requiresLogin: true,
+    source: "research-report",
+    observedAt: "2026-07-03",
+    nativeImplementationAllowed: true,
+    officialWebFallback: "官方网页版已购漫画",
+    verificationStatus: "observed",
+    verificationNote: "Request and response shape are from local research reports and community references; requires real Cookie/browser-session verification before UI can treat it as stable"
   },
   {
     id: "LIBRARY-FAVORITE-LIST",
@@ -338,6 +380,88 @@ export function parseSearchSuggestionsResponse(input: unknown): ApiAdapterResult
   return { ok: true, data: envelope.data.data };
 }
 
+export function buildPurchasedComicsRequest(
+  pageNum: number,
+  pageSize: number
+): ApiAdapterResult<TwirpJsonRequest<{ page_num: number; page_size: number }>> {
+  if (!Number.isInteger(pageNum) || pageNum < 1) {
+    return {
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "GetAutoBuyComics page_num must be an integer greater than 0"
+      }
+    };
+  }
+
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50) {
+    return {
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "GetAutoBuyComics page_size must be between 1 and 50"
+      }
+    };
+  }
+
+  const endpoint = observedTwirpEndpoints.find((item) => item.id === "USER-PURCHASED-COMICS");
+  if (!endpoint) {
+    return {
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "GetAutoBuyComics endpoint is not registered"
+      }
+    };
+  }
+
+  const query = buildTwirpQuery();
+  return {
+    ok: true,
+    data: {
+      endpoint,
+      url: `${buildTwirpUrl(endpoint)}?${query}`,
+      query,
+      headers: buildTwirpHeaders({
+        origin: "https://manga.bilibili.com",
+        referer: "https://manga.bilibili.com/account-center"
+      }),
+      body: {
+        page_num: pageNum,
+        page_size: pageSize
+      }
+    }
+  };
+}
+
+export function parsePurchasedComicsResponse(input: unknown): ApiAdapterResult<PurchasedComic[]> {
+  const envelope = parseTwirpEnvelope<unknown>(input);
+  if (!envelope.ok) {
+    return envelope;
+  }
+
+  if (!Array.isArray(envelope.data.data)) {
+    return {
+      ok: false,
+      error: {
+        kind: "schema",
+        message: "GetAutoBuyComics response data must be an array"
+      }
+    };
+  }
+
+  const comics: PurchasedComic[] = [];
+  for (let index = 0; index < envelope.data.data.length; index += 1) {
+    const parsed = parsePurchasedComic(envelope.data.data[index], index);
+    if (!parsed.ok) {
+      return parsed;
+    }
+    comics.push(parsed.data);
+  }
+
+  return { ok: true, data: comics };
+}
+
 export function parseTwirpEnvelope<T>(input: unknown): ApiAdapterResult<TwirpEnvelope<T>> {
   if (!isRecord(input) || typeof input.code !== "number") {
     return {
@@ -389,4 +513,83 @@ function getTwirpMessage(input: Record<string, unknown>): string {
 
 function isRecord(input: unknown): input is Record<string, unknown> {
   return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
+function parsePurchasedComic(input: unknown, index: number): ApiAdapterResult<PurchasedComic> {
+  if (!isRecord(input)) {
+    return {
+      ok: false,
+      error: {
+        kind: "schema",
+        message: `GetAutoBuyComics item ${index} must be an object`
+      }
+    };
+  }
+
+  const comicId = numberField(input, "comic_id");
+  const title = stringField(input, "comic_title");
+  if (comicId === undefined || !title) {
+    return {
+      ok: false,
+      error: {
+        kind: "schema",
+        message: `GetAutoBuyComics item ${index} must include comic_id and comic_title`
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    data: omitUndefined({
+      comic_id: comicId,
+      comic_title: title,
+      id: numberField(input, "id"),
+      vcover: stringField(input, "vcover"),
+      scover: stringField(input, "scover"),
+      hcover: stringField(input, "hcover"),
+      bought_ep_count: numberField(input, "bought_ep_count"),
+      gold_status: numberField(input, "gold_status"),
+      coupon_status: numberField(input, "coupon_status"),
+      comic_status: numberField(input, "comic_status"),
+      last_ord: numberField(input, "last_ord"),
+      ctime: numberField(input, "ctime"),
+      last_short_title: stringField(input, "last_short_title"),
+      buy_type: numberField(input, "buy_type") ?? numberField(input, "bug_type"),
+      ep_for_chapters: arrayField(input, "ep_for_chapters"),
+      orders: arrayField(input, "orders"),
+      enable_auto_pay: booleanField(input, "enable_auto_pay"),
+      type: numberField(input, "type")
+    })
+  };
+}
+
+function numberField(input: Record<string, unknown>, key: string): number | undefined {
+  const value = input[key];
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function stringField(input: Record<string, unknown>, key: string): string | undefined {
+  const value = input[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function booleanField(input: Record<string, unknown>, key: string): boolean | undefined {
+  const value = input[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function arrayField(input: Record<string, unknown>, key: string): unknown[] | undefined {
+  const value = input[key];
+  return Array.isArray(value) ? value : undefined;
+}
+
+function omitUndefined<T extends Record<string, unknown>>(input: T): T {
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as T;
 }
