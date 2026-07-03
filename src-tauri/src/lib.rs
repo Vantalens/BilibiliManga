@@ -98,6 +98,17 @@ async fn fetch_purchased_comics(
 }
 
 #[tauri::command]
+async fn fetch_class_page(
+    style_id: i32,
+    page_num: i32,
+    page_size: i32,
+) -> Result<api::ClassPageResult, String> {
+    api::fetch_class_page(style_id, page_num, page_size)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 async fn generate_login_qrcode() -> Result<api::QrCodeResult, String> {
     api::generate_qrcode()
         .await
@@ -473,6 +484,7 @@ pub fn run() {
             search_suggestions,
             check_login_status,
             fetch_purchased_comics,
+            fetch_class_page,
             generate_login_qrcode,
             poll_login_status,
             fetch_user_bookshelf,

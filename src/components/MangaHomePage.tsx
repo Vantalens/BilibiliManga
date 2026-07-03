@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { fetchClassPage, type ClassPageComic } from "../bridge/tauriBridge";
 import "../styles-manga.css";
 
 interface Comic {
@@ -13,30 +14,30 @@ interface Comic {
 
 export function MangaHomePage() {
   const [activeCategory, setActiveCategory] = useState("推荐");
+  const [comics, setComics] = useState<ClassPageComic[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // 示例数据 - 稍后将接入真实 API
   const categories = ["推荐", "热血", "古风", "玄幻", "恋爱", "悬疑", "都市", "校园"];
 
-  const featuredComics: Comic[] = [
-    {
-      id: 1,
-      title: "间谍过家家",
-      cover: "https://i0.hdslb.com/bfs/manga-static/4c4d8c38b10e68f8e8c2c5b9c9b2c6c8c9c9c9c9.jpg",
-      author: "远藤达哉",
-      tags: ["热血", "搞笑"],
-      latest: "更新至82话",
-      badge: "热门"
-    },
-    // 更多漫画...
-  ];
+  useEffect(() => {
+    loadComics();
+  }, []);
 
-  const recommendComics: Comic[] = Array(12).fill(null).map((_, i) => ({
-    id: i + 100,
-    title: `推荐漫画 ${i + 1}`,
-    cover: "", // 空字符串，将显示渐变色占位符
-    latest: `${Math.floor(Math.random() * 100)}话`,
-    badge: i % 3 === 0 ? "完结" : i % 3 === 1 ? "更新" : undefined
-  }));
+  const loadComics = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // styleId: -1 表示全部分类（推荐）
+      const result = await fetchClassPage(-1, 1, 18);
+      setComics(result.comics);
+    } catch (err) {
+      setError(`加载失败: ${err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="manga-home">
@@ -64,38 +65,53 @@ export function MangaHomePage() {
         </div>
 
         {/* 漫画网格 */}
-        <div className="comics-grid">
-          {recommendComics.map((comic) => (
-            <div key={comic.id} className="comic-card">
-              <div className="comic-cover">
-                {comic.cover ? (
-                  <img src={comic.cover} alt={comic.title} />
-                ) : (
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    background: 'linear-gradient(135deg, #fb7299 0%, #00a1d6 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    padding: '12px',
-                    textAlign: 'center'
-                  }}>
-                    {comic.title}
-                  </div>
-                )}
-                {comic.badge && (
-                  <div className="comic-badge">{comic.badge}</div>
-                )}
+        {loading && (
+          <div className="loading-state">
+            <div className="loading-icon">⏳</div>
+            <div>加载中...</div>
+          </div>
+        )}
+
+        {error && (
+          <div className="error-message">{error}</div>
+        )}
+
+        {!loading && !error && comics.length > 0 && (
+          <div className="comics-grid">
+            {comics.map((comic) => (
+              <div key={comic.id} className="comic-card">
+                <div className="comic-cover">
+                  {comic.vertical_cover ? (
+                    <img src={comic.vertical_cover} alt={comic.title} />
+                  ) : (
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #fb7299 0%, #00a1d6 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      padding: '12px',
+                      textAlign: 'center'
+                    }}>
+                      {comic.title}
+                    </div>
+                  )}
+                  {comic.is_finish === 1 && (
+                    <div className="comic-badge">完结</div>
+                  )}
+                </div>
+                <div className="comic-title">{comic.title}</div>
+                <div className="comic-meta">
+                  {comic.last_short_title || `${comic.last_ord}话`}
+                </div>
               </div>
-              <div className="comic-title">{comic.title}</div>
-              <div className="comic-meta">{comic.latest}</div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* 加载更多 */}
         <div className="load-more">

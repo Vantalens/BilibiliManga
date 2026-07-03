@@ -101,6 +101,22 @@ export interface PurchasedComicsResult {
   items: PurchasedComic[];
 }
 
+export interface ClassPageComic {
+  id: number;
+  title: string;
+  vertical_cover: string;
+  author_name: string[];
+  styles: string[];
+  is_finish: number;
+  last_ord: number;
+  last_short_title: string;
+}
+
+export interface ClassPageResult {
+  comics: ClassPageComic[];
+  total: number;
+}
+
 export interface LoginCheckResult {
   is_login: boolean;
   uid?: number;
@@ -208,6 +224,14 @@ export async function fetchPurchasedComics(
   cookies: string
 ): Promise<PurchasedComicsResult> {
   return invoke<PurchasedComicsResult>("fetch_purchased_comics", { page, pageSize, cookies });
+}
+
+export async function fetchClassPage(
+  styleId: number,
+  pageNum: number,
+  pageSize: number
+): Promise<ClassPageResult> {
+  return invoke<ClassPageResult>("fetch_class_page", { styleId, pageNum, pageSize });
 }
 
 export async function generateLoginQrcode(): Promise<QrCodeResult> {

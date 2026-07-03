@@ -14,6 +14,7 @@ const SEARCH_SUGGEST_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1
 const PURCHASED_COMICS_ENDPOINT: &str = "https://manga.bilibili.com/twirp/user.v1.User/GetAutoBuyComics?device=pc&platform=web&nov=27";
 const BOOKSHELF_LIST_ENDPOINT: &str = "https://manga.bilibili.com/twirp/bookshelf.v1.Bookshelf/ListFavorite?device=pc&platform=web&nov=27";
 const COMIC_DETAIL_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail?device=pc&platform=web&nov=27";
+const CLASS_PAGE_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/ClassPage?device=pc&platform=web&nov=27";
 const LOGIN_CHECK_ENDPOINT: &str = "https://api.bilibili.com/x/web-interface/nav";
 
 // Validation constraints
@@ -388,6 +389,101 @@ pub async fn fetch_bookshelf(
     Err(ApiError::NotImplemented(
         "bookshelf API structure ready, needs real browser session verification - use official web https://manga.bilibili.com/account-center".to_string(),
     ))
+}
+
+// ClassPage API - Homepage/Category comics
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClassPageRequest {
+    pub style_id: i32,    // -1 for all, or specific category ID
+    pub area_id: i32,     // -1 for all, 1=国漫, 2=日本, 3=韩国
+    pub is_finish: i32,   // -1 for all, 0=连载, 1=完结
+    pub order: i32,       // 0=人气, 1=更新, 2=上架时间
+    pub page_num: i32,
+    pub page_size: i32,
+    pub is_free: i32,     // -1 for all, 0=付费, 1=免费, 2=等就免费
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClassPageComic {
+    pub id: i64,
+    pub title: String,
+    #[serde(default)]
+    pub vertical_cover: String,
+    #[serde(default)]
+    pub author_name: Vec<String>,
+    #[serde(default)]
+    pub styles: Vec<String>,
+    pub is_finish: i32,
+    pub last_ord: f32,
+    #[serde(default)]
+    pub last_short_title: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ClassPageData {
+    #[serde(default)]
+    pub list: Vec<ClassPageComic>,
+    pub total: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClassPageResult {
+    pub comics: Vec<ClassPageComic>,
+    pub total: i32,
+}
+
+pub async fn fetch_class_page(
+    style_id: i32,
+    page_num: i32,
+    page_size: i32,
+) -> Result<ClassPageResult, ApiError> {
+    let client = reqwest::Client::new();
+
+    let request_body = ClassPageRequest {
+        style_id,
+        area_id: -1,  // All areas
+        is_finish: -1, // All status
+        order: 0,      // By popularity
+        page_num,
+        page_size,
+        is_free: -1,   // All types
+    };
+
+    let response = client
+        .post(CLASS_PAGE_ENDPOINT)
+        .header("Content-Type", "application/json")
+        .header("Origin", OFFICIAL_ORIGIN)
+        .header("Referer", OFFICIAL_ORIGIN)
+        .header("User-Agent", USER_AGENT)
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+
+    if !response.status().is_success() {
+        return Err(ApiError::Status(response.status().as_u16()));
+    }
+
+    let envelope: TwirpEnvelope<ClassPageData> = response
+        .json()
+        .await
+        .map_err(|error| ApiError::Schema(error.to_string()))?;
+
+    if envelope.code != 0 {
+        return Err(ApiError::Server {
+            code: envelope.code,
+            message: envelope_message(&envelope),
+        });
+    }
+
+    let data = envelope.data.ok_or_else(|| {
+        ApiError::Schema("ClassPage success response must include data".to_string())
+    })?;
+
+    Ok(ClassPageResult {
+        comics: data.list,
+        total: data.total,
+    })
 }
 
 // Login API - to be verified with real account
