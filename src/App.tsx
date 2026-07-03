@@ -20,6 +20,7 @@ import {
   type StoredLibraryItem
 } from "./bridge/tauriBridge";
 import { ApiTestPanel } from "./components/ApiTestPanel";
+import { PurchasedComicsPage } from "./components/PurchasedComicsPage";
 import { decideAuth, refreshAuthAfterOfficialLogin, type AuthState } from "./domain/auth";
 import { decideEntitlement, refreshEntitlementAfterOfficialWeb, type EntitlementState } from "./domain/entitlement";
 import { filterLibraryItems, summarizeLibrary, type LibraryItem } from "./domain/library";
@@ -28,6 +29,7 @@ import { sampleLibraryItems, sampleReaderPages } from "./sampleData";
 import "./styles.css";
 
 type ReaderMode = "scroll" | "page";
+type ActivePage = "library" | "purchased" | "search" | "settings";
 
 const progressId = "star-sea:chapter-12";
 const readerPreferencesId = "default-reader";
@@ -37,6 +39,7 @@ export default function App() {
   const [readerMode, setReaderMode] = useState<ReaderMode>("scroll");
   const [pageIndex, setPageIndex] = useState(0);
   const [immersive, setImmersive] = useState(false);
+  const [activePage, setActivePage] = useState<ActivePage>("library");
   const [storageStatus, setStorageStatus] = useState<StorageSecurityStatus | null>(null);
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
   const [systemMessage, setSystemMessage] = useState("安全存储尚未初始化");
@@ -262,9 +265,30 @@ export default function App() {
             </div>
           </div>
           <nav className="nav" aria-label="主导航">
-            <button className="nav__item nav__item--active">书库</button>
-            <button className="nav__item">搜索</button>
-            <button className="nav__item">设置</button>
+            <button
+              className={activePage === "library" ? "nav__item nav__item--active" : "nav__item"}
+              onClick={() => setActivePage("library")}
+            >
+              书库
+            </button>
+            <button
+              className={activePage === "purchased" ? "nav__item nav__item--active" : "nav__item"}
+              onClick={() => setActivePage("purchased")}
+            >
+              📚 我的已购
+            </button>
+            <button
+              className={activePage === "search" ? "nav__item nav__item--active" : "nav__item"}
+              onClick={() => setActivePage("search")}
+            >
+              搜索
+            </button>
+            <button
+              className={activePage === "settings" ? "nav__item nav__item--active" : "nav__item"}
+              onClick={() => setActivePage("settings")}
+            >
+              设置
+            </button>
             <button className="nav__item" onClick={() => setAuthState("expired")}>登录过期</button>
           </nav>
           <section className="status-panel" aria-label="本地状态">
@@ -316,7 +340,7 @@ export default function App() {
         )}
 
         <div className={authDecision.canUseAccountFeatures ? "content-grid" : "content-grid content-grid--disabled"}>
-          {!immersive && authDecision.canUseAccountFeatures && (
+          {!immersive && authDecision.canUseAccountFeatures && activePage === "library" && (
             <section className="library-pane" aria-label="本地书库">
               <div className="summary-grid">
                 <Metric label="作品" value={summary.totalItems} />
@@ -367,7 +391,12 @@ export default function App() {
             </section>
           )}
 
-          <section className="reader-pane" aria-label="阅读器" aria-disabled={!authDecision.canUseAccountFeatures}>
+          {!immersive && authDecision.canUseAccountFeatures && activePage === "purchased" && (
+            <PurchasedComicsPage />
+          )}
+
+          {activePage === "library" && (
+            <section className="reader-pane" aria-label="阅读器" aria-disabled={!authDecision.canUseAccountFeatures}>
             <div className="reader-header">
               <div>
                 <p className="eyebrow">示例章节</p>
@@ -411,10 +440,12 @@ export default function App() {
               </div>
             )}
           </section>
+          )}
+
         </div>
 
         {/* API 测试面板 - 用于快速验证真实 Cookie */}
-        {authDecision.canUseAccountFeatures && (
+        {authDecision.canUseAccountFeatures && activePage === "library" && (
           <ApiTestPanel />
         )}
       </section>
