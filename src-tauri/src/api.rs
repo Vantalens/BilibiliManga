@@ -11,8 +11,10 @@ const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 const SEARCH_SUGGEST_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/SearchSug?device=pc&platform=web&nov=27";
 
 // Twirp endpoints - to be verified with real account
+const PURCHASED_COMICS_ENDPOINT: &str = "https://manga.bilibili.com/twirp/user.v1.User/GetAutoBuyComics?device=pc&platform=web&nov=27";
 const BOOKSHELF_LIST_ENDPOINT: &str = "https://manga.bilibili.com/twirp/bookshelf.v1.Bookshelf/ListFavorite?device=pc&platform=web&nov=27";
 const COMIC_DETAIL_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail?device=pc&platform=web&nov=27";
+const LOGIN_CHECK_ENDPOINT: &str = "https://api.bilibili.com/x/web-interface/nav";
 
 // Validation constraints
 const MAX_TERM_CHARS: usize = 80;
@@ -105,6 +107,57 @@ struct BookshelfRequest {
     page_num: i32,
     page_size: i32,
     order: i32,
+}
+
+// Purchased comics types - based on community API documentation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PurchasedComic {
+    pub comic_id: i64,
+    pub comic_title: String,
+    #[serde(default)]
+    pub vcover: Option<String>,
+    #[serde(default)]
+    pub scover: Option<String>,
+    #[serde(default)]
+    pub hcover: Option<String>,
+    #[serde(default)]
+    pub bought_ep_count: Option<i32>,
+    #[serde(default)]
+    pub last_ord: Option<f64>,
+    #[serde(default)]
+    pub last_short_title: Option<String>,
+    #[serde(default)]
+    pub buy_type: Option<i32>,
+    #[serde(default)]
+    pub bug_type: Option<i32>, // Field name variation in API
+    #[serde(default)]
+    pub enable_auto_pay: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PurchasedComicsResult {
+    pub items: Vec<PurchasedComic>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct PurchasedComicsRequest {
+    page_num: i32,
+    page_size: i32,
+}
+
+// Login check types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginCheckResult {
+    pub is_login: bool,
+    pub uid: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct LoginCheckData {
+    #[serde(rename = "isLogin")]
+    is_login: bool,
+    #[serde(default)]
+    mid: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -202,18 +255,138 @@ fn envelope_message<T>(envelope: &TwirpEnvelope<T>) -> String {
     "Bilibili Manga API returned a non-zero code".to_string()
 }
 
+// Login check API - verified from research reports
+pub async fn check_login_status(cookies: &str) -> Result<LoginCheckResult, ApiError> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(LOGIN_CHECK_ENDPOINT)
+        .header(reqwest::header::COOKIE, cookies)
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .send()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(ApiError::Status(status.as_u16()));
+    }
+
+    let envelope = response
+        .json::<TwirpEnvelope<LoginCheckData>>()
+        .await
+        .map_err(|error| ApiError::Schema(error.to_string()))?;
+
+    // code=-101 means not logged in
+    if envelope.code == -101 {
+        return Ok(LoginCheckResult {
+            is_login: false,
+            uid: None,
+        });
+    }
+
+    if envelope.code != 0 {
+        return Err(ApiError::Server {
+            code: envelope.code,
+            message: envelope_message(&envelope),
+        });
+    }
+
+    let data = envelope.data.ok_or_else(|| {
+        ApiError::Schema("nav success response must include data".to_string())
+    })?;
+
+    Ok(LoginCheckResult {
+        is_login: data.is_login,
+        uid: data.mid,
+    })
+}
+
+// Purchased comics API - based on community documentation
+pub async fn fetch_purchased_comics(
+    page: i32,
+    page_size: i32,
+    cookies: &str,
+) -> Result<PurchasedComicsResult, ApiError> {
+    if cookies.trim().is_empty() {
+        return Err(ApiError::Validation(
+            "cookies required for purchased comics".to_string(),
+        ));
+    }
+
+    let request = PurchasedComicsRequest { page_num: page, page_size };
+    let client = reqwest::Client::new();
+    let response = client
+        .post(PURCHASED_COMICS_ENDPOINT)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .header("x-bili-manga-from", "c-int-v1")
+        .header(reqwest::header::ORIGIN, OFFICIAL_ORIGIN)
+        .header(
+            reqwest::header::REFERER,
+            format!("{}/account-center", OFFICIAL_ORIGIN),
+        )
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .header(reqwest::header::COOKIE, cookies)
+        .json(&request)
+        .send()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(ApiError::Status(status.as_u16()));
+    }
+
+    let envelope = response
+        .json::<TwirpEnvelope<Vec<PurchasedComic>>>()
+        .await
+        .map_err(|error| ApiError::Schema(error.to_string()))?;
+
+    // code=-6 means session expired (from RSSHub observation)
+    if envelope.code == -6 {
+        return Err(ApiError::Server {
+            code: -6,
+            message: "session expired - please re-login via official page".to_string(),
+        });
+    }
+
+    // code=99 means context mismatch
+    if envelope.code == 99 {
+        return Err(ApiError::Server {
+            code: 99,
+            message: "request context invalid - may need browser session".to_string(),
+        });
+    }
+
+    if envelope.code != 0 {
+        return Err(ApiError::Server {
+            code: envelope.code,
+            message: envelope_message(&envelope),
+        });
+    }
+
+    let items = envelope.data.ok_or_else(|| {
+        ApiError::Schema("GetAutoBuyComics success response must include data".to_string())
+    })?;
+
+    Ok(PurchasedComicsResult { items })
+}
+
 // Bookshelf API - to be verified with real account
 pub async fn fetch_bookshelf(
     page: i32,
     page_size: i32,
-    _cookies: &str,
+    cookies: &str,
 ) -> Result<BookshelfResult, ApiError> {
-    // Placeholder implementation - requires real account verification
-    // TODO: Implement cookie-based authentication
-    // TODO: Verify request body structure with real API
-    // TODO: Map response fields to BookshelfItem
+    if cookies.trim().is_empty() {
+        return Err(ApiError::Validation(
+            "cookies required for bookshelf".to_string(),
+        ));
+    }
+
+    // Placeholder implementation - structure ready, waiting for real verification
+    // Research reports confirm: needs Cookie, Referer, code=-6 for expired session
     Err(ApiError::NotImplemented(
-        "bookshelf API requires real account verification - use official web fallback https://manga.bilibili.com/account-center".to_string(),
+        "bookshelf API structure ready, needs real browser session verification - use official web https://manga.bilibili.com/account-center".to_string(),
     ))
 }
 

@@ -79,6 +79,24 @@ async fn search_suggestions(
 }
 
 #[tauri::command]
+async fn check_login_status(cookies: String) -> Result<api::LoginCheckResult, String> {
+    api::check_login_status(&cookies)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn fetch_purchased_comics(
+    page: i32,
+    page_size: i32,
+    cookies: String,
+) -> Result<api::PurchasedComicsResult, String> {
+    api::fetch_purchased_comics(page, page_size, &cookies)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 async fn generate_login_qrcode() -> Result<api::QrCodeResult, String> {
     api::generate_qrcode()
         .await
@@ -427,6 +445,8 @@ pub fn run() {
             official_manga_url,
             official_login_url,
             search_suggestions,
+            check_login_status,
+            fetch_purchased_comics,
             generate_login_qrcode,
             poll_login_status,
             fetch_user_bookshelf,

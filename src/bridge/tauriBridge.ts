@@ -83,6 +83,29 @@ export interface BookshelfResult {
   has_more: boolean;
 }
 
+export interface PurchasedComic {
+  comic_id: number;
+  comic_title: string;
+  vcover?: string;
+  scover?: string;
+  hcover?: string;
+  bought_ep_count?: number;
+  last_ord?: number;
+  last_short_title?: string;
+  buy_type?: number;
+  bug_type?: number;
+  enable_auto_pay?: boolean;
+}
+
+export interface PurchasedComicsResult {
+  items: PurchasedComic[];
+}
+
+export interface LoginCheckResult {
+  is_login: boolean;
+  uid?: number;
+}
+
 export interface StoredLibraryItem {
   id: string;
   title: string;
@@ -165,6 +188,18 @@ export async function clearImageCache(): Promise<CacheClearResult> {
 
 export async function getSearchSuggestions(term: string, limit?: number): Promise<SearchSuggestionResult> {
   return invoke<SearchSuggestionResult>("search_suggestions", { term, limit });
+}
+
+export async function checkLoginStatus(cookies: string): Promise<LoginCheckResult> {
+  return invoke<LoginCheckResult>("check_login_status", { cookies });
+}
+
+export async function fetchPurchasedComics(
+  page: number,
+  pageSize: number,
+  cookies: string
+): Promise<PurchasedComicsResult> {
+  return invoke<PurchasedComicsResult>("fetch_purchased_comics", { page, pageSize, cookies });
 }
 
 export async function generateLoginQrcode(): Promise<QrCodeResult> {

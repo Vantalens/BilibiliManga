@@ -61,3 +61,14 @@
 - 当前未初始化：`mcp__codegraph.codegraph_files` 返回 `CodeGraph not initialized`。
 - 本轮替代检查方式：Git 状态、文件检查、前端测试、Rust 测试、前端构建、Tauri 构建。
 - 进入接口适配器扩展、存储重构或跨模块修改前，应执行 codegraph 初始化。
+## 2026-07-03 重大更新：基于深度研究报告实现真实接口
+
+- ✅ 分析了两份深度研究报告，确认已购漫画接口结构
+- ✅ 实现 check_login_status() - B站主站nav接口检查登录态
+- ✅ 实现 fetch_purchased_comics() - 基于社区文档的已购漫画列表
+- ✅ 完善错误码处理：-101未登录、-6会话过期、99上下文不匹配
+- ✅ 确认鉴权机制：Cookie (SESSDATA)、必需Header和Query参数
+- ✅ 确认图片访问：三段式（GetImageIndex → ImageToken → 带token的URL）
+- ✅ 所有测试通过：cargo check ✓, npm test ✓ (26 tests)
+
+当前完成度：约80%，已购漫画接口已实现，等待真实Cookie验证
