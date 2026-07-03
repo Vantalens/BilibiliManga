@@ -24,6 +24,27 @@ export interface CacheClearResult {
   removed_bytes: number;
 }
 
+export interface CacheStatus {
+  entry_count: number;
+  total_bytes: number;
+  expired_count: number;
+  max_bytes: number;
+}
+
+export interface CachePruneResult {
+  removed_entries: number;
+  removed_bytes: number;
+  remaining_bytes: number;
+}
+
+export interface StoredCacheEntry {
+  id: string;
+  relative_path: string;
+  size_bytes: number;
+  last_accessed_at: number;
+  expires_at: number;
+}
+
 export interface SearchSuggestionResult {
   suggestions: string[];
 }
@@ -86,6 +107,18 @@ export async function upsertStoredReaderPreferences(preferences: StoredReaderPre
 
 export async function getStoredReaderPreferences(id: string): Promise<StoredReaderPreferences | null> {
   return invoke<StoredReaderPreferences | null>("get_reader_preferences", { id });
+}
+
+export async function recordImageCacheEntry(entry: StoredCacheEntry): Promise<void> {
+  return invoke<void>("record_image_cache_entry", { entry });
+}
+
+export async function getImageCacheStatus(): Promise<CacheStatus> {
+  return invoke<CacheStatus>("image_cache_status");
+}
+
+export async function pruneImageCache(maxBytes?: number): Promise<CachePruneResult> {
+  return invoke<CachePruneResult>("prune_image_cache", { maxBytes });
 }
 
 export async function clearImageCache(): Promise<CacheClearResult> {

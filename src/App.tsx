@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   clearImageCache,
+  getImageCacheStatus,
   getSearchSuggestions,
   getStorageSecurityStatus,
   getStoredReaderPreferences,
@@ -9,9 +10,11 @@ import {
   listStoredLibraryItems,
   openOfficialMangaPage,
   openOfficialSearchPage,
+  pruneImageCache,
   upsertStoredLibraryItem,
   upsertStoredReaderPreferences,
   upsertStoredReadingProgress,
+  type CacheStatus,
   type StorageSecurityStatus,
   type StoredLibraryItem
 } from "./bridge/tauriBridge";
@@ -31,6 +34,7 @@ export default function App() {
   const [pageIndex, setPageIndex] = useState(0);
   const [immersive, setImmersive] = useState(false);
   const [storageStatus, setStorageStatus] = useState<StorageSecurityStatus | null>(null);
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
   const [systemMessage, setSystemMessage] = useState("安全存储尚未初始化");
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [suggestionStatus, setSuggestionStatus] = useState("官方搜索建议尚未请求");
@@ -64,7 +68,8 @@ export default function App() {
         setReaderMode(preferences.mode);
         setImmersive(preferences.immersive);
       }
-      setSystemMessage("SQLCipher 数据库已初始化，书库、阅读进度和阅读偏好将写入本地加密存储");
+      await refreshCacheStatus();
+      setSystemMessage("SQLCipher 数据库已初始化，书库、阅读进度、阅读偏好和缓存索引将写入本地加密存储");
     } catch (error) {
       setSystemMessage(`安全存储初始化失败：${String(error)}`);
     }
@@ -102,10 +107,32 @@ export default function App() {
     );
   }
 
+  async function refreshCacheStatus() {
+    try {
+      const status = await getImageCacheStatus();
+      setCacheStatus(status);
+    } catch (error) {
+      setSystemMessage(`缓存状态读取失败：${String(error)}`);
+    }
+  }
+
+  async function pruneCache() {
+    try {
+      const result = await pruneImageCache();
+      await refreshCacheStatus();
+      setSystemMessage(
+        `已按过期和容量策略清理 ${result.removed_entries} 条缓存索引，释放 ${formatBytes(result.removed_bytes)}`
+      );
+    } catch (error) {
+      setSystemMessage(`缓存策略清理失败：${String(error)}`);
+    }
+  }
+
   async function clearCache() {
     try {
       const result = await clearImageCache();
-      setSystemMessage(`已清理 ${result.removed_bytes} 字节短期图片缓存`);
+      await refreshCacheStatus();
+      setSystemMessage(`已清理 ${formatBytes(result.removed_bytes)} 短期图片缓存并清空缓存索引`);
     } catch (error) {
       setSystemMessage(`缓存清理失败：${String(error)}`);
     }
@@ -222,7 +249,8 @@ export default function App() {
                 分页
               </button>
               <button onClick={initializeStorage}>初始化安全存储</button>
-              <button onClick={clearCache}>清理缓存</button>
+              <button onClick={pruneCache}>按策略清理缓存</button>
+              <button onClick={clearCache}>清空缓存</button>
               <button onClick={() => changeImmersive(true)}>全屏阅读</button>
             </div>
           </header>
@@ -238,6 +266,13 @@ export default function App() {
                 <Metric label="平均评分" value={summary.averageRating.toFixed(1)} />
               </div>
               <p className="system-message">{systemMessage}</p>
+              <div className="cache-summary" aria-label="图片缓存状态">
+                <span>缓存条目：{cacheStatus?.entry_count ?? 0}</span>
+                <span>过期条目：{cacheStatus?.expired_count ?? 0}</span>
+                <span>
+                  占用：{formatBytes(cacheStatus?.total_bytes ?? 0)} / {formatBytes(cacheStatus?.max_bytes ?? 0)}
+                </span>
+              </div>
               <div className="search-block">
                 <label className="search">
                   <span>筛选书库 / 官方建议</span>
@@ -309,6 +344,20 @@ export default function App() {
       </section>
     </main>
   );
+}
+
+function formatBytes(bytes: number) {
+  if (bytes <= 0) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {

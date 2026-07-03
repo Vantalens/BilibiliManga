@@ -29,6 +29,15 @@ pub struct StoredReaderPreferences {
     pub updated_at: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoredCacheEntry {
+    pub id: String,
+    pub relative_path: String,
+    pub size_bytes: i64,
+    pub last_accessed_at: i64,
+    pub expires_at: i64,
+}
+
 pub fn initialize_encrypted_database(path: &Path, key: &str) -> SqlResult<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -231,6 +240,65 @@ pub fn get_reader_preferences(
     }
 }
 
+pub fn upsert_cache_entry(path: &Path, key: &str, entry: &StoredCacheEntry) -> SqlResult<()> {
+    let connection = open_encrypted_connection(path, key)?;
+    connection.execute(
+        "
+        INSERT INTO cache_entries (id, relative_path, size_bytes, last_accessed_at, expires_at)
+        VALUES (?1, ?2, ?3, ?4, ?5)
+        ON CONFLICT(id) DO UPDATE SET
+          relative_path = excluded.relative_path,
+          size_bytes = excluded.size_bytes,
+          last_accessed_at = excluded.last_accessed_at,
+          expires_at = excluded.expires_at
+        ",
+        params![
+            entry.id,
+            entry.relative_path,
+            entry.size_bytes,
+            entry.last_accessed_at,
+            entry.expires_at
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn list_cache_entries(path: &Path, key: &str) -> SqlResult<Vec<StoredCacheEntry>> {
+    let connection = open_encrypted_connection(path, key)?;
+    let mut statement = connection.prepare(
+        "
+        SELECT id, relative_path, size_bytes, last_accessed_at, expires_at
+        FROM cache_entries
+        ORDER BY last_accessed_at ASC, id ASC
+        ",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok(StoredCacheEntry {
+            id: row.get(0)?,
+            relative_path: row.get(1)?,
+            size_bytes: row.get(2)?,
+            last_accessed_at: row.get(3)?,
+            expires_at: row.get(4)?,
+        })
+    })?;
+
+    rows.collect()
+}
+
+pub fn delete_cache_entries(path: &Path, key: &str, ids: &[String]) -> SqlResult<()> {
+    let connection = open_encrypted_connection(path, key)?;
+    for id in ids {
+        connection.execute("DELETE FROM cache_entries WHERE id = ?1", [id])?;
+    }
+    Ok(())
+}
+
+pub fn clear_cache_entries(path: &Path, key: &str) -> SqlResult<()> {
+    let connection = open_encrypted_connection(path, key)?;
+    connection.execute("DELETE FROM cache_entries", [])?;
+    Ok(())
+}
+
 #[cfg(test)]
 pub fn count_rows_with_key(path: &Path, key: &str, table_name: &str) -> SqlResult<i64> {
     validate_table_name(table_name)?;
@@ -382,5 +450,40 @@ mod tests {
             get_reader_preferences(&path, key, &first.id).expect("preferences query should work");
 
         assert_eq!(stored, Some(second));
+    }
+
+    #[test]
+    fn cache_entries_can_be_listed_and_deleted() {
+        let temp = tempfile::tempdir().expect("temp dir should exist");
+        let path = temp.path().join("bilimanga.db");
+        let key = "test-database-key";
+        initialize_encrypted_database(&path, key).expect("database should initialize");
+        let first = StoredCacheEntry {
+            id: "image-1".to_string(),
+            relative_path: "chapter-1/image-1.bin".to_string(),
+            size_bytes: 32,
+            last_accessed_at: 100,
+            expires_at: 200,
+        };
+        let second = StoredCacheEntry {
+            id: "image-2".to_string(),
+            relative_path: "chapter-1/image-2.bin".to_string(),
+            size_bytes: 64,
+            last_accessed_at: 150,
+            expires_at: 250,
+        };
+
+        upsert_cache_entry(&path, key, &second).expect("second cache entry should store");
+        upsert_cache_entry(&path, key, &first).expect("first cache entry should store");
+        let stored = list_cache_entries(&path, key).expect("cache entries should list");
+        assert_eq!(stored, vec![first.clone(), second.clone()]);
+
+        delete_cache_entries(&path, key, &[first.id]).expect("selected cache entry should delete");
+        assert_eq!(list_cache_entries(&path, key), Ok(vec![second]));
+
+        clear_cache_entries(&path, key).expect("cache index should clear");
+        assert!(list_cache_entries(&path, key)
+            .expect("cache query should work")
+            .is_empty());
     }
 }
