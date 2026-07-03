@@ -52,7 +52,11 @@ export interface SearchSuggestionResult {
 export interface StoredLibraryItem {
   id: string;
   title: string;
+  groups: string[];
+  tags: string[];
   rating: number;
+  notes: string;
+  unread_chapters: number;
   created_at: number;
   updated_at: number;
 }

@@ -6,7 +6,11 @@ use std::path::Path;
 pub struct StoredLibraryItem {
     pub id: String,
     pub title: String,
+    pub groups: Vec<String>,
+    pub tags: Vec<String>,
     pub rating: i64,
+    pub notes: String,
+    pub unread_chapters: i64,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -50,7 +54,11 @@ pub fn initialize_encrypted_database(path: &Path, key: &str) -> SqlResult<()> {
         CREATE TABLE IF NOT EXISTS library_items (
           id TEXT PRIMARY KEY,
           title TEXT NOT NULL,
+          groups_json TEXT NOT NULL DEFAULT '[]',
+          tags_json TEXT NOT NULL DEFAULT '[]',
           rating INTEGER NOT NULL DEFAULT 0,
+          notes TEXT NOT NULL DEFAULT '',
+          unread_chapters INTEGER NOT NULL DEFAULT 0,
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL
         );
@@ -77,6 +85,39 @@ pub fn initialize_encrypted_database(path: &Path, key: &str) -> SqlResult<()> {
         );
         ",
     )?;
+    ensure_library_item_columns(&connection)?;
+    Ok(())
+}
+
+fn ensure_library_item_columns(connection: &Connection) -> SqlResult<()> {
+    let columns = connection
+        .prepare("PRAGMA table_info(library_items)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<SqlResult<Vec<_>>>()?;
+
+    for (column, definition) in [
+        (
+            "groups_json",
+            "ALTER TABLE library_items ADD COLUMN groups_json TEXT NOT NULL DEFAULT '[]'",
+        ),
+        (
+            "tags_json",
+            "ALTER TABLE library_items ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]'",
+        ),
+        (
+            "notes",
+            "ALTER TABLE library_items ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+        ),
+        (
+            "unread_chapters",
+            "ALTER TABLE library_items ADD COLUMN unread_chapters INTEGER NOT NULL DEFAULT 0",
+        ),
+    ] {
+        if !columns.iter().any(|existing| existing == column) {
+            connection.execute(definition, [])?;
+        }
+    }
+
     Ok(())
 }
 
@@ -84,17 +125,27 @@ pub fn upsert_library_item(path: &Path, key: &str, item: &StoredLibraryItem) -> 
     let connection = open_encrypted_connection(path, key)?;
     connection.execute(
         "
-        INSERT INTO library_items (id, title, rating, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5)
+        INSERT INTO library_items (
+          id, title, groups_json, tags_json, rating, notes, unread_chapters, created_at, updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
         ON CONFLICT(id) DO UPDATE SET
           title = excluded.title,
+          groups_json = excluded.groups_json,
+          tags_json = excluded.tags_json,
           rating = excluded.rating,
+          notes = excluded.notes,
+          unread_chapters = excluded.unread_chapters,
           updated_at = excluded.updated_at
         ",
         params![
             item.id,
             item.title,
+            encode_string_list(&item.groups)?,
+            encode_string_list(&item.tags)?,
             item.rating,
+            item.notes,
+            item.unread_chapters,
             item.created_at,
             item.updated_at
         ],
@@ -106,7 +157,7 @@ pub fn list_library_items(path: &Path, key: &str) -> SqlResult<Vec<StoredLibrary
     let connection = open_encrypted_connection(path, key)?;
     let mut statement = connection.prepare(
         "
-        SELECT id, title, rating, created_at, updated_at
+        SELECT id, title, groups_json, tags_json, rating, notes, unread_chapters, created_at, updated_at
         FROM library_items
         ORDER BY updated_at DESC, title ASC
         ",
@@ -115,9 +166,13 @@ pub fn list_library_items(path: &Path, key: &str) -> SqlResult<Vec<StoredLibrary
         Ok(StoredLibraryItem {
             id: row.get(0)?,
             title: row.get(1)?,
-            rating: row.get(2)?,
-            created_at: row.get(3)?,
-            updated_at: row.get(4)?,
+            groups: decode_string_list(row.get::<_, String>(2)?)?,
+            tags: decode_string_list(row.get::<_, String>(3)?)?,
+            rating: row.get(4)?,
+            notes: row.get(5)?,
+            unread_chapters: row.get(6)?,
+            created_at: row.get(7)?,
+            updated_at: row.get(8)?,
         })
     })?;
 
@@ -308,6 +363,17 @@ pub fn count_rows_with_key(path: &Path, key: &str, table_name: &str) -> SqlResul
     })
 }
 
+fn encode_string_list(values: &[String]) -> SqlResult<String> {
+    serde_json::to_string(values)
+        .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))
+}
+
+fn decode_string_list(value: String) -> SqlResult<Vec<String>> {
+    serde_json::from_str(&value).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(error))
+    })
+}
+
 fn open_encrypted_connection(path: &Path, key: &str) -> SqlResult<Connection> {
     let connection = Connection::open(path)?;
     let escaped_key = key.replace('\'', "''");
@@ -385,7 +451,11 @@ mod tests {
         let item = StoredLibraryItem {
             id: "manga-1".to_string(),
             title: "星海回声".to_string(),
+            groups: vec!["追更".to_string(), "科幻".to_string()],
+            tags: vec!["长篇".to_string()],
             rating: 5,
+            notes: "优先阅读".to_string(),
+            unread_chapters: 2,
             created_at: 100,
             updated_at: 200,
         };

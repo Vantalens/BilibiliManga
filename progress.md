@@ -16,6 +16,7 @@
 - 已实现 Rust keyring 数据库密钥基线；前端无法读取密钥明文。
 - 已验证 SQLCipher 加密 SQLite 实际数据库文件：同密钥可读、错误密钥失败、文件头不是明文 SQLite。
 - 已将本地书库和阅读进度写入/读取接入 SQLCipher 数据库，并通过 Rust round-trip 测试验证。
+- 已将书库分组、标签、评分、备注和未读章节写入/读取 SQLCipher 数据库，前端加载时保留这些管理字段。
 - 已将 UI 的示例书库初始化、读取和分页阅读进度保存接入受控 Tauri storage commands。
 - 已将阅读模式和沉浸状态作为阅读偏好写入/读取 SQLCipher 数据库，并通过 Rust round-trip 测试覆盖。
 - 已实现受控 `clear_image_cache`，只清理应用图片缓存目录。

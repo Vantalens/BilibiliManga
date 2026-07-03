@@ -81,7 +81,11 @@ export default function App() {
       const stored: StoredLibraryItem = {
         id: item.id,
         title: item.title,
+        groups: item.groups,
+        tags: item.tags,
         rating: item.rating,
+        notes: item.notes,
+        unread_chapters: item.unreadChapters,
         created_at: now,
         updated_at: now
       };
@@ -100,9 +104,10 @@ export default function App() {
         id: item.id,
         title: item.title,
         rating: item.rating,
-        groups: ["本地加密库"],
-        tags: ["SQLCipher"],
-        unreadChapters: 0
+        groups: item.groups,
+        tags: item.tags,
+        notes: item.notes,
+        unreadChapters: item.unread_chapters
       }))
     );
   }
@@ -299,6 +304,7 @@ export default function App() {
                     <div>
                       <h3>{item.title}</h3>
                       <p>{item.groups.join(" / ")} · {item.tags.join(" / ")}</p>
+                      <p>{item.notes}</p>
                     </div>
                     <strong>{item.rating} 分</strong>
                   </article>

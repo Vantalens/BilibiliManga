@@ -4,6 +4,7 @@ export interface LibraryItem {
   groups: string[];
   tags: string[];
   rating: number;
+  notes: string;
   unreadChapters: number;
 }
 
@@ -25,7 +26,7 @@ export function filterLibraryItems(items: LibraryItem[], filter: LibraryFilter):
   const query = filter.query?.trim().toLowerCase();
 
   return items.filter((item) => {
-    const matchesQuery = !query || item.title.toLowerCase().includes(query);
+    const matchesQuery = !query || `${item.title} ${item.notes}`.toLowerCase().includes(query);
     const matchesGroup = !filter.group || item.groups.includes(filter.group);
     const matchesTag = !filter.tag || item.tags.includes(filter.tag);
     const matchesRating = filter.minRating === undefined || item.rating >= filter.minRating;
@@ -45,4 +46,3 @@ export function summarizeLibrary(items: LibraryItem[]): LibrarySummary {
     averageRating: items.length === 0 ? 0 : totalRating / items.length
   };
 }
-

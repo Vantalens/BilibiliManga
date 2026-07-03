@@ -7,6 +7,7 @@ export const sampleLibraryItems: LibraryItem[] = [
     groups: ["追更", "科幻"],
     tags: ["科幻", "长篇"],
     rating: 5,
+    notes: "重点追更，优先验证长滚动阅读体验",
     unreadChapters: 2
   },
   {
@@ -15,6 +16,7 @@ export const sampleLibraryItems: LibraryItem[] = [
     groups: ["完结"],
     tags: ["悬疑", "短篇"],
     rating: 4,
+    notes: "完结作品，用于筛选和统计回归",
     unreadChapters: 0
   },
   {
@@ -23,6 +25,7 @@ export const sampleLibraryItems: LibraryItem[] = [
     groups: ["追更"],
     tags: ["日常", "治愈"],
     rating: 3,
+    notes: "轻量章节，适合分页模式检查",
     unreadChapters: 1
   }
 ];
@@ -44,4 +47,3 @@ export const sampleReaderPages = [
     tone: "过渡对白"
   }
 ];
-
