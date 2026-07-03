@@ -16,7 +16,7 @@ export default function App() {
       <nav className="top-nav">
         <div className="logo">
           <div className="logo-icon">📚</div>
-          <span>哔哩哔哩漫画</span>
+          <span>BilibiliManga</span>
         </div>
 
         <div className="nav-tabs">

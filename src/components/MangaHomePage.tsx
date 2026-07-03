@@ -33,36 +33,13 @@ export function MangaHomePage() {
   const recommendComics: Comic[] = Array(12).fill(null).map((_, i) => ({
     id: i + 100,
     title: `推荐漫画 ${i + 1}`,
-    cover: "",
+    cover: `https://via.placeholder.com/200x267/FB7299/FFFFFF?text=Comic+${i + 1}`,
     latest: `${Math.floor(Math.random() * 100)}话`,
     badge: i % 3 === 0 ? "完结" : i % 3 === 1 ? "更新" : undefined
   }));
 
   return (
     <div className="manga-home">
-      {/* 顶部导航 */}
-      <nav className="top-nav">
-        <div className="logo">
-          <div className="logo-icon">📚</div>
-          <span>哔哩哔哩漫画</span>
-        </div>
-
-        <div className="nav-tabs">
-          <div className="nav-tab active">主页</div>
-          <div className="nav-tab">我的已购</div>
-          <div className="nav-tab">书架</div>
-          <div className="nav-tab">历史</div>
-        </div>
-
-        <div className="user-actions">
-          <div className="search-box">
-            <span>🔍</span>
-            <input type="text" placeholder="搜索漫画" />
-          </div>
-          <div className="user-avatar"></div>
-        </div>
-      </nav>
-
       {/* 主内容 */}
       <main className="main-content">
         {/* 横幅 */}
