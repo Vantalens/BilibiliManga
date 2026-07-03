@@ -1,6 +1,7 @@
 use serde::Serialize;
 use tauri::Manager;
 
+mod api;
 mod security;
 mod storage;
 
@@ -44,12 +45,24 @@ fn official_manga_url() -> &'static str {
 }
 
 #[tauri::command]
+async fn search_suggestions(
+    term: String,
+    limit: Option<u8>,
+) -> Result<api::SearchSuggestionResult, String> {
+    api::search_suggestions(term, limit)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn storage_security_status() -> security::StorageSecurityStatus {
     security::storage_security_status()
 }
 
 #[tauri::command]
-fn initialize_secure_storage(app: tauri::AppHandle) -> Result<security::StorageSecurityStatus, String> {
+fn initialize_secure_storage(
+    app: tauri::AppHandle,
+) -> Result<security::StorageSecurityStatus, String> {
     let (database_path, database_key) = encrypted_database_context(&app)?;
     storage::initialize_encrypted_database(&database_path, &database_key)
         .map_err(|error| error.to_string())?;
@@ -57,7 +70,10 @@ fn initialize_secure_storage(app: tauri::AppHandle) -> Result<security::StorageS
 }
 
 #[tauri::command]
-fn upsert_library_item(app: tauri::AppHandle, item: storage::StoredLibraryItem) -> Result<(), String> {
+fn upsert_library_item(
+    app: tauri::AppHandle,
+    item: storage::StoredLibraryItem,
+) -> Result<(), String> {
     let (database_path, database_key) = encrypted_database_context(&app)?;
     storage::initialize_encrypted_database(&database_path, &database_key)
         .map_err(|error| error.to_string())?;
@@ -74,7 +90,10 @@ fn list_library_items(app: tauri::AppHandle) -> Result<Vec<storage::StoredLibrar
 }
 
 #[tauri::command]
-fn upsert_reading_progress(app: tauri::AppHandle, progress: storage::StoredReadingProgress) -> Result<(), String> {
+fn upsert_reading_progress(
+    app: tauri::AppHandle,
+    progress: storage::StoredReadingProgress,
+) -> Result<(), String> {
     let (database_path, database_key) = encrypted_database_context(&app)?;
     storage::initialize_encrypted_database(&database_path, &database_key)
         .map_err(|error| error.to_string())?;
@@ -83,7 +102,10 @@ fn upsert_reading_progress(app: tauri::AppHandle, progress: storage::StoredReadi
 }
 
 #[tauri::command]
-fn get_reading_progress(app: tauri::AppHandle, id: String) -> Result<Option<storage::StoredReadingProgress>, String> {
+fn get_reading_progress(
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<Option<storage::StoredReadingProgress>, String> {
     let (database_path, database_key) = encrypted_database_context(&app)?;
     storage::initialize_encrypted_database(&database_path, &database_key)
         .map_err(|error| error.to_string())?;
@@ -102,9 +124,12 @@ fn clear_image_cache(app: tauri::AppHandle) -> Result<CacheClearResult, String> 
     Ok(CacheClearResult { removed_bytes })
 }
 
-fn encrypted_database_context(app: &tauri::AppHandle) -> Result<(std::path::PathBuf, String), String> {
+fn encrypted_database_context(
+    app: &tauri::AppHandle,
+) -> Result<(std::path::PathBuf, String), String> {
     let store = security::SystemSecretStore;
-    let database_key = security::get_or_create_database_key(&store).map_err(|error| error.to_string())?;
+    let database_key =
+        security::get_or_create_database_key(&store).map_err(|error| error.to_string())?;
     let database_path = app
         .path()
         .app_data_dir()
@@ -121,6 +146,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_app_status,
             official_manga_url,
+            search_suggestions,
             storage_security_status,
             initialize_secure_storage,
             upsert_library_item,

@@ -24,6 +24,10 @@ export interface CacheClearResult {
   removed_bytes: number;
 }
 
+export interface SearchSuggestionResult {
+  suggestions: string[];
+}
+
 export interface StoredLibraryItem {
   id: string;
   title: string;
@@ -71,6 +75,10 @@ export async function getStoredReadingProgress(id: string): Promise<StoredReadin
 
 export async function clearImageCache(): Promise<CacheClearResult> {
   return invoke<CacheClearResult>("clear_image_cache");
+}
+
+export async function getSearchSuggestions(term: string, limit?: number): Promise<SearchSuggestionResult> {
+  return invoke<SearchSuggestionResult>("search_suggestions", { term, limit });
 }
 
 export async function openOfficialMangaPage(): Promise<void> {

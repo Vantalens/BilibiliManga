@@ -23,7 +23,8 @@ pub struct StoredReadingProgress {
 
 pub fn initialize_encrypted_database(path: &Path, key: &str) -> SqlResult<()> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
     }
     let connection = open_encrypted_connection(path, key)?;
     connection.execute_batch(
@@ -67,7 +68,13 @@ pub fn upsert_library_item(path: &Path, key: &str, item: &StoredLibraryItem) -> 
           rating = excluded.rating,
           updated_at = excluded.updated_at
         ",
-        params![item.id, item.title, item.rating, item.created_at, item.updated_at],
+        params![
+            item.id,
+            item.title,
+            item.rating,
+            item.created_at,
+            item.updated_at
+        ],
     )?;
     Ok(())
 }
@@ -94,7 +101,11 @@ pub fn list_library_items(path: &Path, key: &str) -> SqlResult<Vec<StoredLibrary
     rows.collect()
 }
 
-pub fn upsert_reading_progress(path: &Path, key: &str, progress: &StoredReadingProgress) -> SqlResult<()> {
+pub fn upsert_reading_progress(
+    path: &Path,
+    key: &str,
+    progress: &StoredReadingProgress,
+) -> SqlResult<()> {
     let connection = open_encrypted_connection(path, key)?;
     connection.execute(
         "
@@ -119,7 +130,11 @@ pub fn upsert_reading_progress(path: &Path, key: &str, progress: &StoredReadingP
     Ok(())
 }
 
-pub fn get_reading_progress(path: &Path, key: &str, id: &str) -> SqlResult<Option<StoredReadingProgress>> {
+pub fn get_reading_progress(
+    path: &Path,
+    key: &str,
+    id: &str,
+) -> SqlResult<Option<StoredReadingProgress>> {
     let connection = open_encrypted_connection(path, key)?;
     let result = connection.query_row(
         "
@@ -151,7 +166,9 @@ pub fn get_reading_progress(path: &Path, key: &str, id: &str) -> SqlResult<Optio
 pub fn count_rows_with_key(path: &Path, key: &str, table_name: &str) -> SqlResult<i64> {
     validate_table_name(table_name)?;
     let connection = open_encrypted_connection(path, key)?;
-    connection.query_row(&format!("SELECT COUNT(*) FROM {table_name}"), [], |row| row.get(0))
+    connection.query_row(&format!("SELECT COUNT(*) FROM {table_name}"), [], |row| {
+        row.get(0)
+    })
 }
 
 fn open_encrypted_connection(path: &Path, key: &str) -> SqlResult<Connection> {
@@ -169,7 +186,9 @@ fn validate_table_name(table_name: &str) -> SqlResult<()> {
     if allowed.contains(&table_name) {
         Ok(())
     } else {
-        Err(rusqlite::Error::InvalidParameterName(table_name.to_string()))
+        Err(rusqlite::Error::InvalidParameterName(
+            table_name.to_string(),
+        ))
     }
 }
 
@@ -249,11 +268,17 @@ mod tests {
             mode: "scroll".to_string(),
             updated_at: 100,
         };
-        let second = StoredReadingProgress { page_index: 5, mode: "page".to_string(), updated_at: 200, ..first.clone() };
+        let second = StoredReadingProgress {
+            page_index: 5,
+            mode: "page".to_string(),
+            updated_at: 200,
+            ..first.clone()
+        };
 
         upsert_reading_progress(&path, key, &first).expect("progress should be stored");
         upsert_reading_progress(&path, key, &second).expect("progress should update");
-        let stored = get_reading_progress(&path, key, &first.id).expect("progress query should work");
+        let stored =
+            get_reading_progress(&path, key, &first.id).expect("progress query should work");
 
         assert_eq!(stored, Some(second));
     }

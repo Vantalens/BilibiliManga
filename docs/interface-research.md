@@ -53,6 +53,7 @@
 - 请求头：`content-type=application/json`、`x-bili-manga-from=c-int-v1`，并带浏览器 `origin`/`referer` 时返回正常。
 - 响应：HTTP 200，JSON 包络为 `{"code":0,"msg":"","data":["有兽焉"]}`。
 - 当前固化：`parseSearchSuggestionsResponse` 只接受 `data` 为字符串数组；非零 `code` 映射为 server error；缺少 `code` 或 data 形态不符映射为 schema error。
+- 已新增受控后端命令 `search_suggestions(term, limit)`：只调用已验证 `SearchSug`，限制空输入、最大 80 字符和 1-20 条建议，不处理 Cookie、登录态、支付或图片。
 - 失败模式：`https://manga.bilibili.co/twirp/...` 在本机 TLS 握手 EOF；`http://manga.bilibili.co/twirp/...` 返回 empty reply。运行时不得硬编码依赖该裸域成功。
 
 关键词搜索：

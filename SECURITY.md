@@ -18,6 +18,7 @@
 - 响应样例必须脱敏；不得保存 Cookie、Token、账号、订单、密钥或图片真实鉴权 URL。
 - 钱包、券、余额、订单、支付、充值、购买、解锁和权益变更端点只能标记为禁止原生实现。
 - 允许类接口必须先有 schema 测试、失败模式和降级路径，再接入 UI 或 Rust bridge。
+- 当前 Rust `search_suggestions` 只接入 verified 的公开 `SearchSug`，不发送 Cookie，不处理账号态，不调用关键词 `Search`、详情、图片或权益端点。
 
 ## 缓存策略
 

@@ -18,8 +18,12 @@ pub enum SecurityError {
 impl fmt::Display for SecurityError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SecurityError::Random(message) => write!(formatter, "random generation failed: {message}"),
-            SecurityError::SecretStore(message) => write!(formatter, "secret store failed: {message}"),
+            SecurityError::Random(message) => {
+                write!(formatter, "random generation failed: {message}")
+            }
+            SecurityError::SecretStore(message) => {
+                write!(formatter, "secret store failed: {message}")
+            }
             SecurityError::Io(error) => write!(formatter, "io failed: {error}"),
         }
     }
@@ -142,7 +146,11 @@ mod tests {
 
     impl SecretStore for MemorySecretStore {
         fn get_secret(&self, service: &str, user: &str) -> Result<Option<String>, SecurityError> {
-            Ok(self.secrets.borrow().get(&format!("{service}:{user}")).cloned())
+            Ok(self
+                .secrets
+                .borrow()
+                .get(&format!("{service}:{user}"))
+                .cloned())
         }
 
         fn set_secret(&self, service: &str, user: &str, secret: &str) -> Result<(), SecurityError> {
@@ -205,11 +213,17 @@ mod tests {
         fs::create_dir(&cache).expect("cache dir should be created");
         fs::write(cache.join("a.bin"), [1_u8, 2, 3]).expect("file should be written");
         fs::create_dir(cache.join("nested")).expect("nested dir should be created");
-        fs::write(cache.join("nested").join("b.bin"), [4_u8, 5]).expect("nested file should be written");
+        fs::write(cache.join("nested").join("b.bin"), [4_u8, 5])
+            .expect("nested file should be written");
 
         let removed = clear_cache_dir(&cache).expect("cache should be cleared");
 
         assert_eq!(removed, 5);
-        assert_eq!(fs::read_dir(&cache).expect("cache dir should remain").count(), 0);
+        assert_eq!(
+            fs::read_dir(&cache)
+                .expect("cache dir should remain")
+                .count(),
+            0
+        );
     }
 }
