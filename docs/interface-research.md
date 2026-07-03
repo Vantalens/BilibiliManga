@@ -86,9 +86,10 @@
 | 模块 | 方法 | 登录要求 | 原生允许 | 降级路径 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | 用户/登录态 | `/user.v1.User/GetNewbieInfo` | 是 | 允许调研 | 官方网页登录页 | 已观察，未真实登录验证 |
-| 书架 | `/bookshelf.v1.Bookshelf/ListFavorite` | 是 | 允许调研 | 官方网页版书架 | 已观察，未真实登录验证 |
+| 书架 | `/bookshelf.v1.Bookshelf/ListFavorite` | 是 | 允许调研 | 官方网页版书架 https://manga.bilibili.com/account-center | 结构已就绪，等待真实验证 |
 | 阅读历史 | `/bookshelf.v1.Bookshelf/ListHistory` | 是 | 允许调研 | 官方网页版历史 | 已观察，未真实登录验证 |
-| 搜索建议 | `/comic.v1.Comic/SearchSug` | 否 | 允许调研 | 官方搜索页 | 已验证公开响应 schema |
+| 漫画详情 | `/comic.v1.Comic/ComicDetail` | 否/是 | 允许调研 | 官方详情页 https://manga.bilibili.com/detail/mc{id} | 结构已就绪，等待真实验证 |
+| 搜索建议 | `/comic.v1.Comic/SearchSug` | 否 | 允许调研 | 官方搜索页 | ✅ 已验证公开响应 schema |
 | 钱包 | `/user.v1.User/GetWallet` | 是 | 禁止原生实现 | 官方钱包页 | 已阻断 |
 | 用户权益卡 | `/card.v1.Card/GetUserCardInfo` | 是 | 禁止原生实现 | 官方用户权益页 | 已阻断 |
 
@@ -96,8 +97,63 @@
 
 | 模块 | 状态 | 验证内容 | 降级路径 |
 | --- | --- | --- | --- |
-| 扫码登录 | 未开始 | 二维码获取、轮询、登录态保存、过期 | 官方网页登录页 |
-| 书架 | 已观察方法名 | 请求体、分页、排序、异常状态、真实响应字段 | 官方网页版书架 |
+| 扫码登录 | 实现中 | 二维码获取、轮询、登录态保存、过期 | 官方网页登录页 https://passport.bilibili.com/login |
+| 书架 | 实现中 | 请求体、分页、排序、异常状态、真实响应字段 | 官方网页版书架 https://manga.bilibili.com/account-center |
+| 详情 | 实现中 | ComicDetail 正确请求体、章节列表、权益状态字段 | 官方详情页 https://manga.bilibili.com/detail/mc{id} |
+| 章节图片 | 未开始 | GetImageIndex、ImageToken 请求体和响应、图片 URL 构造 | 官方阅读页 |
+| 阅读历史 | 未开始 | ListHistory 请求体、响应字段、时间戳格式 | 官方历史页 https://manga.bilibili.com/account-center/history |
+| 进度同步 | 未开始 | 上报接口（如存在）、频率限制、冲突处理 | 本地优先，不强制同步 |
+
+## 2026-07-03 实现进展
+
+### 已完成结构
+
+1. **Rust API 模块扩展** (`src-tauri/src/api.rs`)
+   - 新增 `QrCodeResult`、`LoginStatus`、`Cookie` 类型
+   - 新增 `BookshelfItem`、`BookshelfResult` 类型
+   - 新增占位函数：`generate_qrcode()`、`poll_login_status()`、`fetch_bookshelf()`
+   - 所有未验证接口返回 `ApiError::NotImplemented` 并提供官方网页降级链接
+
+2. **Tauri 命令注册** (`src-tauri/src/lib.rs`)
+   - 新增命令：`generate_login_qrcode`
+   - 新增命令：`poll_login_status`
+   - 新增命令：`fetch_user_bookshelf`
+
+3. **前端 Bridge 扩展** (`src/bridge/tauriBridge.ts`)
+   - 新增类型：`QrCodeResult`、`LoginStatus`、`Cookie`
+   - 新增类型：`BookshelfItem`、`BookshelfResult`
+   - 新增函数：`generateLoginQrcode()`
+   - 新增函数：`pollLoginStatus()`
+   - 新增函数：`fetchUserBookshelf()`
+
+### 验证状态
+
+- ✅ Rust 编译通过 (`cargo check`)
+- ✅ 前端编译通过 (`npm run build`)
+- ✅ 前端测试通过 (`npm test` - 7 files, 26 tests)
+- ⚠️ 新增接口尚未接入 UI
+- ⚠️ 真实账号验证待完成
+
+### 下一步
+
+1. **真实接口验证**（需要手动浏览器抓包）
+   - 登录流程：打开 DevTools → 访问 manga.bilibili.com → 扫码登录 → 记录 API 调用
+   - 书架同步：登录后访问书架 → 观察 ListFavorite 请求和响应
+   - 详情页：点击漫画 → 观察 ComicDetail 请求体参数
+
+2. **实现真实 API 调用**
+   - 根据抓包结果更新 Rust `api.rs` 中的占位函数
+   - 添加 Cookie 管理和持久化
+   - 实现登录态检查和过期处理
+
+3. **UI 接入**
+   - 在 App.tsx 中添加登录按钮和 QR 码显示
+   - 登录成功后调用 `fetchUserBookshelf` 替换示例数据
+   - 添加登录态恢复和过期处理流程
+
+4. **真实 GUI 测试**
+   - 生成 Windows 安装包
+   - 真实环境登录和书架加载验证
 | 阅读历史 | 已观察方法名 | 最近阅读、进度字段、同步方向、真实响应字段 | 本地最近阅读 |
 | 搜索 | 搜索建议已验证；关键词 Search 请求字段已确认但裸调失败 | 关键词搜索成功响应 schema、分页、空结果、限流 | 官方搜索页 |
 | 漫画详情 | 已观察方法名，裸调失败 | `ComicDetail` 请求体、上下文、标题、作者、简介、封面、状态 | 官方详情页 |

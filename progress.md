@@ -1,6 +1,6 @@
 # BiliManga progress
 
-版本：v0.5.0
+版本：v0.6.0
 作者：Codex
 状态：草稿
 最后更新：2026-07-03
@@ -33,10 +33,15 @@
 - 已新增 GitHub 工作流文档，并将文档同步、提交、推送和验证门禁接入 README、AGENT_RULES、TEST_PLAN、SECURITY。
 - 已建立 release gate 文档；当前仅支持内测安装包。
 - 已生成 Windows 内测 NSIS 安装包。
+- ✅ **新增**：已扩展 Rust API 模块，添加 `QrCodeResult`、`LoginStatus`、`BookshelfItem`、`BookshelfResult` 类型和占位函数。
+- ✅ **新增**：已注册 Tauri 命令：`generate_login_qrcode`、`poll_login_status`、`fetch_user_bookshelf`。
+- ✅ **新增**：已扩展前端 Bridge，添加对应的 TypeScript 类型和调用函数。
+- ✅ **新增**：Rust 编译通过、前端编译通过、前端测试通过（7 files, 26 tests）。
+- ✅ **新增**：已提取官方 B 站客户端的登录页地址（`https://passport.bilibili.com/login`）和架构模式（WebView 登录、混淆代码）。
 
 ## In Progress
 
-- 阶段 3：真实哔哩哔哩漫画接口调研已开始；已完成公开页面/静态 JS 观察和公开搜索建议响应 schema 验证，登录态、书架响应 schema、章节、图片和进度仍未完成真实路径验证。
+- 阶段 3：真实哔哩哔哩漫画接口调研继续推进；已完成 API 结构预留，等待真实账号验证登录、书架、详情、章节、图片和进度接口。
 
 ## Next
 

@@ -1,10 +1,20 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-const SEARCH_SUGGEST_ENDPOINT: &str =
-    "https://manga.bilibili.com/twirp/comic.v1.Comic/SearchSug?device=pc&platform=web&nov=27";
+// API endpoints - base configuration
+const TWIRP_BASE: &str = "https://manga.bilibili.com/twirp";
 const OFFICIAL_ORIGIN: &str = "https://manga.bilibili.com";
+const PASSPORT_BASE: &str = "https://passport.bilibili.com";
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
+
+// Twirp endpoints - verified
+const SEARCH_SUGGEST_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/SearchSug?device=pc&platform=web&nov=27";
+
+// Twirp endpoints - to be verified with real account
+const BOOKSHELF_LIST_ENDPOINT: &str = "https://manga.bilibili.com/twirp/bookshelf.v1.Bookshelf/ListFavorite?device=pc&platform=web&nov=27";
+const COMIC_DETAIL_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail?device=pc&platform=web&nov=27";
+
+// Validation constraints
 const MAX_TERM_CHARS: usize = 80;
 const DEFAULT_SUGGESTION_LIMIT: u8 = 10;
 const MAX_SUGGESTION_LIMIT: u8 = 20;
@@ -16,6 +26,7 @@ pub enum ApiError {
     Status(u16),
     Server { code: i64, message: String },
     Schema(String),
+    NotImplemented(String),
 }
 
 impl fmt::Display for ApiError {
@@ -28,6 +39,7 @@ impl fmt::Display for ApiError {
                 write!(formatter, "api returned code {code}: {message}")
             }
             ApiError::Schema(message) => write!(formatter, "schema mismatch: {message}"),
+            ApiError::NotImplemented(message) => write!(formatter, "not implemented: {message}"),
         }
     }
 }
@@ -43,6 +55,56 @@ pub struct SearchSuggestionResult {
 pub struct SearchSuggestionRequest {
     term: String,
     num: u8,
+}
+
+// Login types - structure ready, needs real account verification
+#[derive(Debug, Clone, Serialize)]
+pub struct QrCodeResult {
+    pub url: String,
+    pub qrcode_key: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LoginStatus {
+    Scanning,
+    Confirmed,
+    Success { cookies: Vec<Cookie> },
+    Expired,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Cookie {
+    pub name: String,
+    pub value: String,
+    pub domain: String,
+}
+
+// Bookshelf types - structure ready, needs real account verification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookshelfItem {
+    pub comic_id: i64,
+    pub title: String,
+    pub vertical_cover: Option<String>,
+    pub is_finish: Option<i32>,
+    pub last_ord: Option<f64>,
+    pub last_short_title: Option<String>,
+    pub styles: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BookshelfResult {
+    pub items: Vec<BookshelfItem>,
+    pub total: i64,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BookshelfRequest {
+    page_num: i32,
+    page_size: i32,
+    order: i32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,6 +200,41 @@ fn envelope_message<T>(envelope: &TwirpEnvelope<T>) -> String {
         return envelope.message.clone();
     }
     "Bilibili Manga API returned a non-zero code".to_string()
+}
+
+// Bookshelf API - to be verified with real account
+pub async fn fetch_bookshelf(
+    page: i32,
+    page_size: i32,
+    _cookies: &str,
+) -> Result<BookshelfResult, ApiError> {
+    // Placeholder implementation - requires real account verification
+    // TODO: Implement cookie-based authentication
+    // TODO: Verify request body structure with real API
+    // TODO: Map response fields to BookshelfItem
+    Err(ApiError::NotImplemented(
+        "bookshelf API requires real account verification - use official web fallback https://manga.bilibili.com/account-center".to_string(),
+    ))
+}
+
+// Login API - to be verified with real account
+pub async fn generate_qrcode() -> Result<QrCodeResult, ApiError> {
+    // Placeholder implementation - requires passport API verification
+    // TODO: Implement QR code generation endpoint
+    // TODO: Verify response structure
+    Err(ApiError::NotImplemented(
+        "QR login requires passport API verification - use official login page https://passport.bilibili.com/login".to_string(),
+    ))
+}
+
+pub async fn poll_login_status(_qrcode_key: &str) -> Result<LoginStatus, ApiError> {
+    // Placeholder implementation - requires passport API verification
+    // TODO: Implement polling endpoint
+    // TODO: Handle all login states (scanning/confirmed/success/expired/failed)
+    // TODO: Extract cookies from success response
+    Err(ApiError::NotImplemented(
+        "login polling requires passport API verification - use official login page https://passport.bilibili.com/login".to_string(),
+    ))
 }
 
 #[cfg(test)]

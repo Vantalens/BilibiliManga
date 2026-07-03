@@ -79,6 +79,31 @@ async fn search_suggestions(
 }
 
 #[tauri::command]
+async fn generate_login_qrcode() -> Result<api::QrCodeResult, String> {
+    api::generate_qrcode()
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn poll_login_status(qrcode_key: String) -> Result<api::LoginStatus, String> {
+    api::poll_login_status(&qrcode_key)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn fetch_user_bookshelf(
+    page: i32,
+    page_size: i32,
+    cookies: String,
+) -> Result<api::BookshelfResult, String> {
+    api::fetch_bookshelf(page, page_size, &cookies)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn storage_security_status() -> security::StorageSecurityStatus {
     security::storage_security_status()
 }
@@ -402,6 +427,9 @@ pub fn run() {
             official_manga_url,
             official_login_url,
             search_suggestions,
+            generate_login_qrcode,
+            poll_login_status,
+            fetch_user_bookshelf,
             storage_security_status,
             initialize_secure_storage,
             upsert_library_item,

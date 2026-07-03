@@ -49,6 +49,40 @@ export interface SearchSuggestionResult {
   suggestions: string[];
 }
 
+export interface QrCodeResult {
+  url: string;
+  qrcode_key: string;
+}
+
+export type LoginStatus =
+  | { type: "scanning" }
+  | { type: "confirmed" }
+  | { type: "success"; cookies: Cookie[] }
+  | { type: "expired" }
+  | { type: "failed" };
+
+export interface Cookie {
+  name: string;
+  value: string;
+  domain: string;
+}
+
+export interface BookshelfItem {
+  comic_id: number;
+  title: string;
+  vertical_cover?: string;
+  is_finish?: number;
+  last_ord?: number;
+  last_short_title?: string;
+  styles?: string[];
+}
+
+export interface BookshelfResult {
+  items: BookshelfItem[];
+  total: number;
+  has_more: boolean;
+}
+
 export interface StoredLibraryItem {
   id: string;
   title: string;
@@ -131,6 +165,22 @@ export async function clearImageCache(): Promise<CacheClearResult> {
 
 export async function getSearchSuggestions(term: string, limit?: number): Promise<SearchSuggestionResult> {
   return invoke<SearchSuggestionResult>("search_suggestions", { term, limit });
+}
+
+export async function generateLoginQrcode(): Promise<QrCodeResult> {
+  return invoke<QrCodeResult>("generate_login_qrcode");
+}
+
+export async function pollLoginStatus(qrcodeKey: string): Promise<LoginStatus> {
+  return invoke<LoginStatus>("poll_login_status", { qrcodeKey });
+}
+
+export async function fetchUserBookshelf(
+  page: number,
+  pageSize: number,
+  cookies: string
+): Promise<BookshelfResult> {
+  return invoke<BookshelfResult>("fetch_user_bookshelf", { page, pageSize, cookies });
 }
 
 export async function openOfficialMangaPage(): Promise<void> {
