@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   checkLoginStatus,
   fetchPurchasedComics,
+  storeCookiesSecure,
+  getStoredCookies,
+  deleteStoredCookies,
+  hasStoredCookies,
   type LoginCheckResult,
   type PurchasedComicsResult,
 } from "../bridge/tauriBridge";
@@ -21,6 +25,69 @@ export function ApiTestPanel() {
   const [purchasedResult, setPurchasedResult] = useState<PurchasedComicsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSaved, setHasSaved] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Check if cookies are stored on mount
+  useEffect(() => {
+    checkStoredCookies();
+  }, []);
+
+  const checkStoredCookies = async () => {
+    try {
+      const hasStored = await hasStoredCookies();
+      setHasSaved(hasStored);
+      if (hasStored) {
+        const stored = await getStoredCookies();
+        setCookies(stored.raw_cookie);
+      }
+    } catch (err) {
+      // No stored cookies, that's fine
+      setHasSaved(false);
+    }
+  };
+
+  const handleSaveCookies = async () => {
+    if (!cookies.trim()) {
+      setError("请输入 Cookie");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await storeCookiesSecure(cookies);
+      setHasSaved(true);
+      setSuccess("✓ Cookie 已安全保存到系统密钥环");
+      console.log("Cookies stored securely");
+    } catch (err) {
+      setError(`保存失败: ${err}`);
+      console.error("Store cookies error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCookies = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await deleteStoredCookies();
+      setHasSaved(false);
+      setCookies("");
+      setSuccess("✓ Cookie 已删除");
+      console.log("Cookies deleted");
+    } catch (err) {
+      setError(`删除失败: ${err}`);
+      console.error("Delete cookies error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCheckLogin = async () => {
     if (!cookies.trim()) {
@@ -133,7 +200,54 @@ export function ApiTestPanel() {
         >
           {loading ? "测试中..." : "2️⃣ 获取已购漫画"}
         </button>
+
+        <button
+          onClick={handleSaveCookies}
+          disabled={loading || !cookies.trim()}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "#722ed1",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: loading || !cookies.trim() ? "not-allowed" : "pointer",
+            fontWeight: "bold"
+          }}
+        >
+          {hasSaved ? "🔒 更新保存" : "🔒 保存到密钥环"}
+        </button>
+
+        {hasSaved && (
+          <button
+            onClick={handleDeleteCookies}
+            disabled={loading}
+            style={{
+              padding: "10px 20px",
+              backgroundColor: "#ff4d4f",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontWeight: "bold"
+            }}
+          >
+            🗑️ 删除保存
+          </button>
+        )}
       </div>
+
+      {success && (
+        <div style={{
+          padding: "12px",
+          backgroundColor: "#f6ffed",
+          border: "1px solid #b7eb8f",
+          borderRadius: "4px",
+          marginBottom: "20px",
+          color: "#389e0d"
+        }}>
+          {success}
+        </div>
+      )}
 
       {error && (
         <div style={{

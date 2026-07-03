@@ -106,6 +106,14 @@ export interface LoginCheckResult {
   uid?: number;
 }
 
+export interface StoredCookies {
+  sessdata: string;
+  bili_jct: string;
+  dede_user_id: string;
+  raw_cookie: string;
+  expires_at?: number;
+}
+
 export interface StoredLibraryItem {
   id: string;
   title: string;
@@ -216,6 +224,22 @@ export async function fetchUserBookshelf(
   cookies: string
 ): Promise<BookshelfResult> {
   return invoke<BookshelfResult>("fetch_user_bookshelf", { page, pageSize, cookies });
+}
+
+export async function storeCookiesSecure(rawCookie: string): Promise<void> {
+  return invoke<void>("store_cookies_secure", { rawCookie });
+}
+
+export async function getStoredCookies(): Promise<StoredCookies> {
+  return invoke<StoredCookies>("get_stored_cookies");
+}
+
+export async function deleteStoredCookies(): Promise<void> {
+  return invoke<void>("delete_stored_cookies");
+}
+
+export async function hasStoredCookies(): Promise<boolean> {
+  return invoke<boolean>("has_stored_cookies");
 }
 
 export async function openOfficialMangaPage(): Promise<void> {

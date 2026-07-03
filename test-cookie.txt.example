@@ -1,0 +1,21 @@
+# BiliManga Cookie 模板
+#
+# 请将此文件重命名为 test-cookie.txt
+# 并将下面的示例替换为你从浏览器复制的真实 Cookie
+#
+# 获取方法：
+# 1. Chrome → F12 → Network
+# 2. 登录 https://manga.bilibili.com
+# 3. 找到任意请求 → Headers → Cookie
+# 4. 复制完整的 Cookie 字符串
+#
+# 示例格式（你的 Cookie 应该类似这样，但更长）：
+# SESSDATA=your_session_data_here; bili_jct=your_jct_here; DedeUserID=123456789; ...
+#
+# ⚠️ 重要提醒：
+# - Cookie 包含敏感信息，切勿分享
+# - test-cookie.txt 已在 .gitignore 中，不会被提交到 Git
+# - 测试完成后建议删除此文件
+#
+# 将你的真实 Cookie 粘贴到下面这行（删除 # 号）：
+#

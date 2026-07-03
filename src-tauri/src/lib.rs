@@ -4,6 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
 mod api;
+mod cookies;
 mod security;
 mod storage;
 
@@ -119,6 +120,31 @@ async fn fetch_user_bookshelf(
     api::fetch_bookshelf(page, page_size, &cookies)
         .await
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn store_cookies_secure(raw_cookie: String) -> Result<(), String> {
+    let parsed = cookies::parse_cookie_string(&raw_cookie)
+        .map_err(|e| e.to_string())?;
+    cookies::store_cookies(&parsed)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_stored_cookies() -> Result<cookies::StoredCookies, String> {
+    cookies::get_cookies()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_stored_cookies() -> Result<(), String> {
+    cookies::delete_cookies()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn has_stored_cookies() -> bool {
+    cookies::has_stored_cookies()
 }
 
 #[tauri::command]
@@ -450,6 +476,10 @@ pub fn run() {
             generate_login_qrcode,
             poll_login_status,
             fetch_user_bookshelf,
+            store_cookies_secure,
+            get_stored_cookies,
+            delete_stored_cookies,
+            has_stored_cookies,
             storage_security_status,
             initialize_secure_storage,
             upsert_library_item,
