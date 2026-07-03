@@ -22,6 +22,7 @@
 - 已记录公开 PC 首页和公开静态 JS 中观察到的 Twirp 基础路径、请求固定参数、书架/历史/搜索建议方法名和钱包/权益类禁止端点。
 - 已验证公开搜索建议端点 `SearchSug` 的请求体、同站运行时基址、成功响应 schema 和 `.co` 裸域失败模式。
 - 已新增 Rust 受控 `search_suggestions` 命令和前端 bridge，只允许访问 verified 的 `SearchSug`，未验证 `Search` 不接入。
+- 已将 `search_suggestions` 接入 UI 的书库搜索区，采用手动请求、建议回填和官方网页降级。
 - 已确认关键词 `Search` 端点请求体为 `key_word/page_num/page_size`，但公开裸调返回 `code=99`，当前标记为 failed，不进入真实 adapter。
 - 已记录详情页 JS 中观察到的 `ComicDetail`、`GetImageIndex`、`ImageToken` 方法名，并阻断购买、租借、支付、订单和钱包相关端点。
 - 已新增 GitHub 工作流文档，并将文档同步、提交、推送和验证门禁接入 README、AGENT_RULES、TEST_PLAN、SECURITY。

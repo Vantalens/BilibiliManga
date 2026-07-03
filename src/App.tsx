@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   clearImageCache,
+  getSearchSuggestions,
   getStorageSecurityStatus,
   getStoredReadingProgress,
   initializeSecureStorage,
   listStoredLibraryItems,
   openOfficialMangaPage,
+  openOfficialSearchPage,
   upsertStoredLibraryItem,
   upsertStoredReadingProgress,
   type StorageSecurityStatus,
@@ -27,6 +29,8 @@ export default function App() {
   const [immersive, setImmersive] = useState(false);
   const [storageStatus, setStorageStatus] = useState<StorageSecurityStatus | null>(null);
   const [systemMessage, setSystemMessage] = useState("安全存储尚未初始化");
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+  const [suggestionStatus, setSuggestionStatus] = useState("官方搜索建议尚未请求");
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>(sampleLibraryItems);
 
   const filteredItems = useMemo(
@@ -96,6 +100,28 @@ export default function App() {
       setSystemMessage(`已清理 ${result.removed_bytes} 字节短期图片缓存`);
     } catch (error) {
       setSystemMessage(`缓存清理失败：${String(error)}`);
+    }
+  }
+  async function requestSearchSuggestions() {
+    const term = query.trim();
+    if (!term) {
+      setSearchSuggestions([]);
+      setSuggestionStatus("输入关键词后可请求官方搜索建议");
+      return;
+    }
+
+    try {
+      setSuggestionStatus("正在请求官方搜索建议");
+      const result = await getSearchSuggestions(term, 8);
+      setSearchSuggestions(result.suggestions);
+      setSuggestionStatus(
+        result.suggestions.length > 0
+          ? "已通过受控 Tauri bridge 获取官方搜索建议"
+          : "官方搜索建议为空，可改用官方搜索页"
+      );
+    } catch (error) {
+      setSearchSuggestions([]);
+      setSuggestionStatus(`搜索建议失败，保留本地筛选并可使用官方搜索页：${String(error)}`);
     }
   }
 
@@ -183,10 +209,26 @@ export default function App() {
                 <Metric label="平均评分" value={summary.averageRating.toFixed(1)} />
               </div>
               <p className="system-message">{systemMessage}</p>
-              <label className="search">
-                <span>筛选书库</span>
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="输入标题关键词" />
-              </label>
+              <div className="search-block">
+                <label className="search">
+                  <span>筛选书库 / 官方建议</span>
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="输入标题关键词" />
+                </label>
+                <div className="search-actions">
+                  <button onClick={requestSearchSuggestions}>获取建议</button>
+                  <button onClick={() => openOfficialSearchPage(query)}>打开官方搜索</button>
+                </div>
+                <p className="suggestion-status">{suggestionStatus}</p>
+                {searchSuggestions.length > 0 && (
+                  <div className="suggestion-list" aria-label="官方搜索建议">
+                    {searchSuggestions.map((suggestion) => (
+                      <button key={suggestion} onClick={() => setQuery(suggestion)}>
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="library-list">
                 {filteredItems.map((item) => (
                   <article key={item.id} className="library-item">
