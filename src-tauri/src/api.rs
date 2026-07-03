@@ -433,65 +433,194 @@ pub struct ClassPageResult {
 }
 
 pub async fn fetch_class_page(
-    style_id: i32,
-    page_num: i32,
-    page_size: i32,
+    _style_id: i32,
+    _page_num: i32,
+    _page_size: i32,
 ) -> Result<ClassPageResult, ApiError> {
+    // ClassPage returns code 99 without authentication
+    // Instead, parse SSR data from homepage HTML (public, no auth needed)
+    fetch_homepage_ssr_data().await
+}
+
+// Parse SSR data from homepage HTML
+async fn fetch_homepage_ssr_data() -> Result<ClassPageResult, ApiError> {
     let client = reqwest::Client::new();
 
-    let request_body = ClassPageRequest {
-        style_id,
-        area_id: -1,  // All areas
-        is_finish: -1, // All status
-        order: 0,      // By popularity
-        page_num,
-        page_size,
-        is_free: -1,   // All types
-    };
-
-    // Debug: print request for troubleshooting
-    eprintln!("ClassPage request: {:?}", request_body);
-
     let response = client
-        .post(CLASS_PAGE_ENDPOINT)
-        .header("Content-Type", "application/json")
-        .header("Origin", OFFICIAL_ORIGIN)
-        .header("Referer", "https://manga.bilibili.com/classify")
+        .get("https://manga.bilibili.com/")
         .header("User-Agent", USER_AGENT)
-        .header("x-bili-manga-from", "c-int-v1")
-        .json(&request_body)
         .send()
         .await
         .map_err(|error| ApiError::Transport(error.to_string()))?;
-
-    eprintln!("ClassPage response status: {}", response.status());
 
     if !response.status().is_success() {
         return Err(ApiError::Status(response.status().as_u16()));
     }
 
-    let text = response.text().await
-        .map_err(|error| ApiError::Schema(error.to_string()))?;
+    let html = response
+        .text()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
 
-    eprintln!("ClassPage response body: {}", text);
+    parse_homepage_comics(&html)
+}
 
-    let envelope: TwirpEnvelope<ClassPageData> = serde_json::from_str(&text)
-        .map_err(|error| ApiError::Schema(error.to_string()))?;
-
-    if envelope.code != 0 {
-        return Err(ApiError::Server {
-            code: envelope.code,
-            message: envelope_message(&envelope),
-        });
+fn parse_homepage_comics(html: &str) -> Result<ClassPageResult, ApiError> {
+    // Look for window.__INITIAL_STATE__ or embedded JSON in script tags
+    // Pattern 1: window.__INITIAL_STATE__ = {...}
+    if let Some(start) = html.find("window.__INITIAL_STATE__") {
+        if let Some(json_start) = html[start..].find('{') {
+            let json_start_pos = start + json_start;
+            // Find matching closing brace
+            if let Some(json_end) = find_json_end(&html[json_start_pos..]) {
+                let json_str = &html[json_start_pos..json_start_pos + json_end];
+                return parse_initial_state_json(json_str);
+            }
+        }
     }
 
-    let data = envelope.data.ok_or_else(|| {
-        ApiError::Schema("ClassPage success response must include data".to_string())
-    })?;
+    // Pattern 2: Look for any script tag with comic data
+    // This is a fallback - we'll refine based on actual HTML structure
+    Err(ApiError::Schema(
+        "Could not find SSR data in homepage HTML".to_string(),
+    ))
+}
+
+fn find_json_end(json_str: &str) -> Option<usize> {
+    let mut depth = 0;
+    let mut in_string = false;
+    let mut escape_next = false;
+
+    for (i, ch) in json_str.chars().enumerate() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escape_next = true,
+            '"' => in_string = !in_string,
+            '{' if !in_string => depth += 1,
+            '}' if !in_string => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i + 1);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn parse_initial_state_json(json_str: &str) -> Result<ClassPageResult, ApiError> {
+    // Parse the JSON and extract comic list
+    let value: serde_json::Value = serde_json::from_str(json_str)
+        .map_err(|error| ApiError::Schema(format!("JSON parse error: {}", error)))?;
+
+    // Try to find comics in common SSR data paths
+    let comics = extract_comics_from_json(&value)?;
+    let total = comics.len() as i32;
 
     Ok(ClassPageResult {
-        comics: data.list,
-        total: data.total,
+        comics,
+        total,
+    })
+}
+
+fn extract_comics_from_json(value: &serde_json::Value) -> Result<Vec<ClassPageComic>, ApiError> {
+    // Common paths where SSR data might store comics:
+    // - data.list
+    // - recommendList
+    // - homeData.list
+    // etc.
+
+    let mut comics = Vec::new();
+
+    // Try multiple possible paths
+    if let Some(list) = value.get("data").and_then(|d| d.get("list")) {
+        if let Some(arr) = list.as_array() {
+            for item in arr {
+                if let Ok(comic) = parse_comic_from_json(item) {
+                    comics.push(comic);
+                }
+            }
+        }
+    }
+
+    if comics.is_empty() {
+        // Try other paths...
+        if let Some(list) = value.get("recommendList") {
+            if let Some(arr) = list.as_array() {
+                for item in arr {
+                    if let Ok(comic) = parse_comic_from_json(item) {
+                        comics.push(comic);
+                    }
+                }
+            }
+        }
+    }
+
+    if comics.is_empty() {
+        return Err(ApiError::Schema(
+            "No comics found in SSR JSON data".to_string(),
+        ));
+    }
+
+    Ok(comics)
+}
+
+fn parse_comic_from_json(item: &serde_json::Value) -> Result<ClassPageComic, ApiError> {
+    Ok(ClassPageComic {
+        id: item
+            .get("comic_id")
+            .or_else(|| item.get("id"))
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| ApiError::Schema("Missing comic id".to_string()))?,
+        title: item
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        vertical_cover: item
+            .get("vertical_cover")
+            .or_else(|| item.get("vcover"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        author_name: item
+            .get("author_name")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|s| s.as_str())
+                    .map(|s| s.to_string())
+                    .collect()
+            })
+            .unwrap_or_default(),
+        styles: item
+            .get("styles")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|s| s.as_str())
+                    .map(|s| s.to_string())
+                    .collect()
+            })
+            .unwrap_or_default(),
+        is_finish: item
+            .get("is_finish")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0) as i32,
+        last_ord: item
+            .get("last_ord")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0) as f32,
+        last_short_title: item
+            .get("last_short_title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
     })
 }
 

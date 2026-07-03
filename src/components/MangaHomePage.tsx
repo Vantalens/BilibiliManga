@@ -45,41 +45,13 @@ export function MangaHomePage() {
     setLoading(true);
     setError(null);
     try {
-      // 尝试方案 1: ClassPage API
+      // 只尝试 ClassPage API（公开接口，不需要登录）
       const result = await fetchClassPage(-1, 1, 18);
       setComics(result.comics);
     } catch (err) {
       console.error("ClassPage API failed:", err);
-
-      // 方案 2: 使用已购漫画数据（如果有 Cookie）
-      try {
-        const { getStoredCookies, fetchPurchasedComics } = await import("../bridge/tauriBridge");
-        const cookies = await getStoredCookies();
-        if (cookies && cookies.raw_cookie) {
-          const purchased = await fetchPurchasedComics(1, 18, cookies.raw_cookie);
-          if (purchased.items.length > 0) {
-            // 转换为 ClassPageComic 格式
-            const converted = purchased.items.map(item => ({
-              id: item.comic_id,
-              title: item.comic_title,
-              vertical_cover: item.vcover || '',
-              author_name: [],
-              styles: [],
-              is_finish: 0,
-              last_ord: item.last_ord || 0,
-              last_short_title: item.last_short_title || ''
-            }));
-            setComics(converted);
-            setError("显示你的已购漫画（ClassPage 接口暂不可用）");
-            return;
-          }
-        }
-      } catch (purchaseErr) {
-        console.error("Fallback to purchased comics failed:", purchaseErr);
-      }
-
-      // 方案 3: 显示占位符
       setError("ClassPage 接口暂不可用，显示示例数据");
+      // 使用占位数据
     } finally {
       setLoading(false);
     }
