@@ -56,26 +56,10 @@ export function MangaPurchasedPage() {
   return (
     <div className="main-content">
       {/* 页面标题 */}
-      <div style={{
-        marginBottom: "24px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center"
-      }}>
+      <div className="page-header">
         <div>
-          <h2 style={{
-            fontSize: "24px",
-            marginBottom: "8px",
-            color: "var(--text-primary)"
-          }}>
-            我的已购
-          </h2>
-          <p style={{
-            fontSize: "14px",
-            color: "var(--text-secondary)"
-          }}>
-            共 {comics.length} 部漫画
-          </p>
+          <h2 className="page-title">我的已购</h2>
+          <p className="page-subtitle">共 {comics.length} 部漫画</p>
         </div>
         <button
           onClick={() => {
@@ -84,15 +68,7 @@ export function MangaPurchasedPage() {
             loadPurchasedComics();
           }}
           disabled={loading}
-          style={{
-            padding: "8px 24px",
-            background: "var(--bg-card)",
-            border: "1px solid var(--border-color)",
-            borderRadius: "20px",
-            color: "var(--text-primary)",
-            cursor: loading ? "not-allowed" : "pointer",
-            fontSize: "14px",
-          }}
+          className="load-more-btn"
         >
           🔄 刷新
         </button>
@@ -100,40 +76,23 @@ export function MangaPurchasedPage() {
 
       {/* 错误提示 */}
       {error && (
-        <div style={{
-          padding: "16px",
-          background: "rgba(251, 114, 153, 0.1)",
-          border: "1px solid rgba(251, 114, 153, 0.3)",
-          borderRadius: "8px",
-          color: "var(--bili-pink)",
-          marginBottom: "24px",
-        }}>
-          {error}
-        </div>
+        <div className="error-message">{error}</div>
       )}
 
       {/* 加载状态 */}
       {loading && comics.length === 0 && (
-        <div style={{
-          textAlign: "center",
-          padding: "80px 20px",
-          color: "var(--text-secondary)",
-        }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>⏳</div>
+        <div className="loading-state">
+          <div className="loading-icon">⏳</div>
           <div>加载中...</div>
         </div>
       )}
 
       {/* 空状态 */}
       {!loading && !error && comics.length === 0 && (
-        <div style={{
-          textAlign: "center",
-          padding: "80px 20px",
-          color: "var(--text-secondary)",
-        }}>
-          <div style={{ fontSize: "64px", marginBottom: "16px" }}>📭</div>
-          <div style={{ fontSize: "18px", marginBottom: "8px" }}>暂无已购漫画</div>
-          <p style={{ fontSize: "14px" }}>
+        <div className="empty-state">
+          <div className="empty-icon">📭</div>
+          <div className="empty-title">暂无已购漫画</div>
+          <p className="empty-desc">
             在官方网站购买漫画后，这里会显示你的已购列表
           </p>
         </div>
