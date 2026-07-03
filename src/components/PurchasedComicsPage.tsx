@@ -101,7 +101,7 @@ export function PurchasedComicsPage({ onClose }: PurchasedComicsPageProps) {
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >
-            🔄 刷新
+            刷新
           </button>
           {onClose && (
             <button
@@ -248,7 +248,7 @@ export function PurchasedComicsPage({ onClose }: PurchasedComicsPageProps) {
                       fontSize: "11px",
                       color: "#0050b3",
                     }}>
-                      🔄 已开启自动购买
+                      已开启已购
                     </div>
                   )}
                 </div>

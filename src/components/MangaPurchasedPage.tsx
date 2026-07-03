@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   fetchPurchasedComics,
   getStoredCookies,
@@ -6,6 +6,11 @@ import {
   type PurchasedComic,
 } from "../bridge/tauriBridge";
 import "../styles-manga.css";
+
+function getCoverUrl(comic: PurchasedComic): string {
+  const cover = comic.vcover || comic.scover || comic.hcover || "";
+  return cover.startsWith("//") ? "https:" + cover : cover;
+}
 
 export function MangaPurchasedPage() {
   const [comics, setComics] = useState<PurchasedComic[]>([]);
@@ -15,25 +20,25 @@ export function MangaPurchasedPage() {
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
-    loadPurchasedComics();
+    void loadPurchasedComics(page);
   }, [page]);
 
-  const loadPurchasedComics = async () => {
+  const loadPurchasedComics = async (targetPage: number) => {
     setLoading(true);
     setError(null);
 
     try {
       const hasCookies = await hasStoredCookies();
       if (!hasCookies) {
-        setError("请先登录");
+        setError("需要先登录后才能同步已购列表。未购买漫画仍可通过推荐和搜索浏览公开信息。");
         setLoading(false);
         return;
       }
 
       const stored = await getStoredCookies();
-      const result = await fetchPurchasedComics(page, 15, stored.raw_cookie);
+      const result = await fetchPurchasedComics(targetPage, 15, stored.raw_cookie);
 
-      if (page === 1) {
+      if (targetPage === 1) {
         setComics(result.items);
       } else {
         setComics((prev) => [...prev, ...result.items]);
@@ -41,138 +46,80 @@ export function MangaPurchasedPage() {
 
       setHasMore(result.items.length === 15);
     } catch (err) {
-      setError(`${err}`);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLoadMore = () => {
-    if (!loading && hasMore) {
-      setPage((prev) => prev + 1);
-    }
+  const refresh = () => {
+    setComics([]);
+    setPage(1);
+    void loadPurchasedComics(1);
   };
 
   return (
-    <div className="main-content">
-      {/* 页面标题 */}
-      <div className="page-header">
+    <section className="feed-page">
+      <div className="section-header">
         <div>
-          <h2 className="page-title">我的已购</h2>
-          <p className="page-subtitle">共 {comics.length} 部漫画</p>
+          <h2>我的已购</h2>
+          <p>{comics.length > 0 ? "已同步 " + comics.length + " 部漫画" : "登录后同步已购漫画"}</p>
         </div>
-        <button
-          onClick={() => {
-            setPage(1);
-            setComics([]);
-            loadPurchasedComics();
-          }}
-          disabled={loading}
-          className="load-more-btn"
-        >
-          🔄 刷新
+        <button className="ghost-button" onClick={refresh} disabled={loading} type="button">
+          刷新
         </button>
       </div>
 
-      {/* 错误提示 */}
-      {error && (
-        <div className="error-message">{error}</div>
-      )}
+      {error && <div className="notice notice--error">{error}</div>}
 
-      {/* 加载状态 */}
       {loading && comics.length === 0 && (
-        <div className="loading-state">
-          <div className="loading-icon">⏳</div>
-          <div>加载中...</div>
+        <div className="comic-grid" aria-label="加载中">
+          {Array.from({ length: 10 }, (_, index) => (
+            <div className="comic-card comic-card--skeleton" key={index}>
+              <div className="comic-thumb" />
+              <div className="skeleton-line" />
+              <div className="skeleton-line skeleton-line--short" />
+            </div>
+          ))}
         </div>
       )}
 
-      {/* 空状态 */}
       {!loading && !error && comics.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-icon">📭</div>
-          <div className="empty-title">暂无已购漫画</div>
-          <p className="empty-desc">
-            在官方网站购买漫画后，这里会显示你的已购列表
-          </p>
+        <div className="state-page state-page--inline">
+          <h2>暂无已购漫画</h2>
+          <p>同步成功前只显示真实账号数据。</p>
         </div>
       )}
 
-      {/* 漫画网格 */}
       {comics.length > 0 && (
         <>
-          <div className="comics-grid">
-            {comics.map((comic) => (
-              <div key={comic.comic_id} className="comic-card">
-                <div className="comic-cover">
-                  {comic.vcover ? (
-                    <img
-                      src={comic.vcover}
-                      alt={comic.comic_title}
-                      onError={(e) => {
-                        // 图片加载失败时，隐藏 img 标签，显示 div 占位符
-                        e.currentTarget.style.display = 'none';
-                        const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
-                        if (placeholder) placeholder.style.display = 'flex';
-                      }}
-                    />
-                  ) : null}
-                  <div style={{
-                    width: "100%",
-                    height: "100%",
-                    display: comic.vcover ? "none" : "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "linear-gradient(135deg, #fb7299 0%, #00a1d6 100%)",
-                    color: "white",
-                    fontSize: "12px",
-                    padding: "12px",
-                    textAlign: "center",
-                    fontWeight: "bold"
-                  }}>
-                    {comic.comic_title}
+          <div className="comic-grid">
+            {comics.map((comic) => {
+              const cover = getCoverUrl(comic);
+              return (
+                <article className="comic-card" key={comic.comic_id}>
+                  <div className="comic-thumb">
+                    {cover ? <img src={cover} alt={comic.comic_title} loading="lazy" /> : <div className="cover-fallback">{comic.comic_title}</div>}
+                    <span className="comic-status">已购</span>
                   </div>
-
-                  {comic.enable_auto_pay && (
-                    <div className="comic-badge">自动购买</div>
-                  )}
-                </div>
-
-                <div className="comic-title">{comic.comic_title}</div>
-                <div className="comic-meta">
-                  已购 {comic.bought_ep_count ?? 0} 话
-                  {comic.last_short_title && ` · 最新 ${comic.last_short_title}`}
-                </div>
-              </div>
-            ))}
+                  <h3 className="comic-title">{comic.comic_title}</h3>
+                  <p className="comic-meta">
+                    已购 {comic.bought_ep_count ?? 0} 话{comic.last_short_title ? " · " + comic.last_short_title : ""}
+                  </p>
+                </article>
+              );
+            })}
           </div>
 
-          {/* 加载更多 */}
           {hasMore && (
-            <div className="load-more">
-              <button
-                className="load-more-btn"
-                onClick={handleLoadMore}
-                disabled={loading}
-              >
-                {loading ? "加载中..." : "加载更多"}
+            <div className="load-more-row">
+              <button className="ghost-button" onClick={() => setPage((prev) => prev + 1)} disabled={loading} type="button">
+                {loading ? "加载中" : "加载更多"}
               </button>
-            </div>
-          )}
-
-          {/* 加载完成 */}
-          {!hasMore && (
-            <div style={{
-              textAlign: "center",
-              padding: "32px",
-              color: "var(--text-secondary)",
-              fontSize: "14px",
-            }}>
-              已加载全部漫画
             </div>
           )}
         </>
       )}
-    </div>
+    </section>
   );
 }

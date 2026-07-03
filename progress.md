@@ -24,6 +24,7 @@
 - 已建立 API 边界文档，阻止购买/充值/解锁等敏感链路进入原生 adapter。
 - 已将阅读器接入权益状态 gate；未解锁或未知状态会显示失败恢复面板，敏感流程只打开官方网页并在返回后刷新状态。
 - 已新增登录状态 gate；未登录或登录过期时阻止账号功能，只打开官方登录页或使用本地调试态验证界面流程，不保存 Cookie/Token。
+- 已新增未购买漫画浏览策略：允许公开信息和章节目录浏览，免费/试读或已解锁章节可读，锁定章节图片仍阻止应用内渲染和缓存。
 - 已记录公开 PC 首页和公开静态 JS 中观察到的 Twirp 基础路径、请求固定参数、书架/历史/搜索建议方法名和钱包/权益类禁止端点。
 - 已验证公开搜索建议端点 `SearchSug` 的请求体、同站运行时基址、成功响应 schema 和 `.co` 裸域失败模式。
 - 已新增 Rust 受控 `search_suggestions` 命令和前端 bridge，只允许访问 verified 的 `SearchSug`，未验证 `Search` 不接入。
@@ -67,3 +68,5 @@
 - 已在 `src/domain/apiAdapter.ts` 增加 `USER-PURCHASED-COMICS` 候选端点、请求构造和响应解析；该 domain 层不接触真实 Cookie。
 - 已补充 `GetAutoBuyComics` 请求构造、分页校验、响应 schema、`bug_type` 兼容和异常 schema 测试。
 - 当前真实接口完成度不能声明 80%；可确认的是 `SearchSug` 已验证，`GetAutoBuyComics` 进入候选适配阶段，书架/详情/章节/图片/进度仍待真实账号验证。
+- 已参考 `Zeal-L/BiliBili-Manga-Downloader`：官方 B 站解析路径只支持免费和已解锁章节；BiliPlus/未解锁下载路径不纳入本项目。
+- 已按 B 站 PC 客户端方向重做前端主框架：左侧窄栏、顶部频道导航、搜索框、简约漫画网格；首页不放横幅广告位，不使用伪造推荐内容。
