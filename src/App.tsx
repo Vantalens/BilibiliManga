@@ -18,6 +18,7 @@ import {
   type StorageSecurityStatus,
   type StoredLibraryItem
 } from "./bridge/tauriBridge";
+import { decideEntitlement, refreshEntitlementAfterOfficialWeb, type EntitlementState } from "./domain/entitlement";
 import { filterLibraryItems, summarizeLibrary, type LibraryItem } from "./domain/library";
 import { getNextPageIndex, getPreviousPageIndex } from "./domain/reader";
 import { sampleLibraryItems, sampleReaderPages } from "./sampleData";
@@ -39,12 +40,15 @@ export default function App() {
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [suggestionStatus, setSuggestionStatus] = useState("官方搜索建议尚未请求");
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>(sampleLibraryItems);
+  const [entitlementState, setEntitlementState] = useState<EntitlementState>("accessible");
+  const [officialFlowPending, setOfficialFlowPending] = useState(false);
 
   const filteredItems = useMemo(
     () => filterLibraryItems(libraryItems, { query }),
     [libraryItems, query]
   );
   const summary = useMemo(() => summarizeLibrary(libraryItems), [libraryItems]);
+  const entitlementDecision = useMemo(() => decideEntitlement(entitlementState), [entitlementState]);
 
   useEffect(() => {
     getStorageSecurityStatus()
@@ -212,6 +216,19 @@ export default function App() {
     void persistProgress(nextPageIndex, readerMode);
   }
 
+  async function openOfficialEntitlementFlow() {
+    setOfficialFlowPending(true);
+    setSystemMessage("已打开官方网页处理权益状态，返回后请刷新状态");
+    await openOfficialMangaPage();
+  }
+
+  function refreshEntitlement(observedState: EntitlementState) {
+    const result = refreshEntitlementAfterOfficialWeb(entitlementState, observedState);
+    setEntitlementState(result.state);
+    setOfficialFlowPending(false);
+    setSystemMessage(result.message);
+  }
+
   const currentPage = sampleReaderPages[pageIndex];
 
   return (
@@ -256,6 +273,8 @@ export default function App() {
               <button onClick={initializeStorage}>初始化安全存储</button>
               <button onClick={pruneCache}>按策略清理缓存</button>
               <button onClick={clearCache}>清空缓存</button>
+              <button onClick={() => setEntitlementState("locked")}>设为未解锁</button>
+              <button onClick={() => refreshEntitlement("accessible")}>刷新为可访问</button>
               <button onClick={() => changeImmersive(true)}>全屏阅读</button>
             </div>
           </header>
@@ -320,12 +339,23 @@ export default function App() {
                 <h2>星海回声 · 第 12 话</h2>
               </div>
               <div className="reader-header__actions">
-                <button onClick={openOfficialMangaPage}>官方网页处理未解锁</button>
+                <button onClick={openOfficialEntitlementFlow}>官方网页处理未解锁</button>
                 {immersive && <button onClick={() => changeImmersive(false)}>显示 UI</button>}
               </div>
             </div>
 
-            {readerMode === "scroll" ? (
+            {!entitlementDecision.canReadInApp ? (
+              <section className="recovery-panel" aria-label="权益状态恢复">
+                <strong>{entitlementDecision.message}</strong>
+                <p>应用不会执行购买、支付或解锁请求。敏感流程必须在官方网页完成，返回后只刷新可访问状态。</p>
+                <div className="reader-header__actions">
+                  <button onClick={openOfficialEntitlementFlow}>打开官方网页</button>
+                  <button onClick={() => refreshEntitlement("unknown")}>刷新状态</button>
+                  <button onClick={() => refreshEntitlement("accessible")}>刷新为可访问</button>
+                </div>
+                {officialFlowPending && <p>官方网页已打开，等待返回后刷新状态。</p>}
+              </section>
+            ) : readerMode === "scroll" ? (
               <div className="scroll-reader">
                 {sampleReaderPages.map((page) => (
                   <ReaderPage key={page.id} label={page.label} tone={page.tone} />

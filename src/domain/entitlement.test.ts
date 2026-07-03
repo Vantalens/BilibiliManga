@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideEntitlement } from "./entitlement";
+import { decideEntitlement, refreshEntitlementAfterOfficialWeb } from "./entitlement";
 
 describe("entitlement decisions", () => {
   it("allows in-app reading only for accessible chapters", () => {
@@ -22,5 +22,15 @@ describe("entitlement decisions", () => {
       requiresOfficialWeb: true
     });
   });
-});
 
+  it("refreshes entitlement after official web without granting unknown access", () => {
+    expect(refreshEntitlementAfterOfficialWeb("locked", "accessible")).toMatchObject({
+      state: "accessible",
+      returnedFromOfficialWeb: true
+    });
+    expect(refreshEntitlementAfterOfficialWeb("locked", "unknown")).toMatchObject({
+      state: "locked",
+      returnedFromOfficialWeb: true
+    });
+  });
+});

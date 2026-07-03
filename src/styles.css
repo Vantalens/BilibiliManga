@@ -352,3 +352,30 @@ button:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.recovery-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #f0c36d;
+  border-radius: 8px;
+  background: #fff8e6;
+  color: #553c00;
+}
+
+.recovery-panel p {
+  margin: 0;
+  color: #6f5a1e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .recovery-panel {
+    background: #332b16;
+    border-color: #8d6f20;
+    color: #ffe8a3;
+  }
+
+  .recovery-panel p {
+    color: #e5ce8c;
+  }
+}
