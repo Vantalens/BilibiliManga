@@ -8,6 +8,7 @@ import {
   getStoredReadingProgress,
   initializeSecureStorage,
   listStoredLibraryItems,
+  openOfficialLoginPage,
   openOfficialMangaPage,
   openOfficialSearchPage,
   pruneImageCache,
@@ -18,6 +19,7 @@ import {
   type StorageSecurityStatus,
   type StoredLibraryItem
 } from "./bridge/tauriBridge";
+import { decideAuth, refreshAuthAfterOfficialLogin, type AuthState } from "./domain/auth";
 import { decideEntitlement, refreshEntitlementAfterOfficialWeb, type EntitlementState } from "./domain/entitlement";
 import { filterLibraryItems, summarizeLibrary, type LibraryItem } from "./domain/library";
 import { getNextPageIndex, getPreviousPageIndex } from "./domain/reader";
@@ -40,6 +42,8 @@ export default function App() {
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [suggestionStatus, setSuggestionStatus] = useState("官方搜索建议尚未请求");
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>(sampleLibraryItems);
+  const [authState, setAuthState] = useState<AuthState>("unauthenticated");
+  const [officialLoginPending, setOfficialLoginPending] = useState(false);
   const [entitlementState, setEntitlementState] = useState<EntitlementState>("accessible");
   const [officialFlowPending, setOfficialFlowPending] = useState(false);
 
@@ -48,6 +52,7 @@ export default function App() {
     [libraryItems, query]
   );
   const summary = useMemo(() => summarizeLibrary(libraryItems), [libraryItems]);
+  const authDecision = useMemo(() => decideAuth(authState), [authState]);
   const entitlementDecision = useMemo(() => decideEntitlement(entitlementState), [entitlementState]);
 
   useEffect(() => {
@@ -216,6 +221,19 @@ export default function App() {
     void persistProgress(nextPageIndex, readerMode);
   }
 
+  async function openOfficialLoginFlow() {
+    setOfficialLoginPending(true);
+    setSystemMessage("已打开官方登录页，返回后请刷新登录状态");
+    await openOfficialLoginPage();
+  }
+
+  function refreshAuth(observedState: AuthState) {
+    const result = refreshAuthAfterOfficialLogin(authState, observedState);
+    setAuthState(result.state);
+    setOfficialLoginPending(false);
+    setSystemMessage(result.message);
+  }
+
   async function openOfficialEntitlementFlow() {
     setOfficialFlowPending(true);
     setSystemMessage("已打开官方网页处理权益状态，返回后请刷新状态");
@@ -246,12 +264,15 @@ export default function App() {
             <button className="nav__item nav__item--active">书库</button>
             <button className="nav__item">搜索</button>
             <button className="nav__item">设置</button>
+            <button className="nav__item" onClick={() => setAuthState("expired")}>登录过期</button>
           </nav>
           <section className="status-panel" aria-label="本地状态">
             <span>缓存策略</span>
             <strong>{storageStatus?.cache_policy ?? "短期缓存 · 不可导出"}</strong>
             <span>数据保护</span>
             <strong>{storageStatus?.database_key_source ?? "系统密钥环计划中"}</strong>
+            <span>登录状态</span>
+            <strong>{authDecision.state}</strong>
           </section>
         </aside>
       )}
@@ -280,8 +301,21 @@ export default function App() {
           </header>
         )}
 
-        <div className="content-grid">
-          {!immersive && (
+        {!authDecision.canUseAccountFeatures && (
+          <section className="login-panel" aria-label="登录状态恢复">
+            <strong>{authDecision.message}</strong>
+            <p>当前不会保存 Cookie、Token 或账号标识。真实扫码登录接口完成调研前，只能打开官方登录页或使用本地调试态验证界面流程。</p>
+            <div className="reader-header__actions">
+              <button onClick={openOfficialLoginFlow}>打开官方登录页</button>
+              <button onClick={() => refreshAuth("unauthenticated")}>刷新登录状态</button>
+              <button onClick={() => refreshAuth("authenticated")}>本地调试通过</button>
+            </div>
+            {officialLoginPending && <p>官方登录页已打开，等待返回后刷新登录状态。</p>}
+          </section>
+        )}
+
+        <div className={authDecision.canUseAccountFeatures ? "content-grid" : "content-grid content-grid--disabled"}>
+          {!immersive && authDecision.canUseAccountFeatures && (
             <section className="library-pane" aria-label="本地书库">
               <div className="summary-grid">
                 <Metric label="作品" value={summary.totalItems} />
@@ -332,7 +366,7 @@ export default function App() {
             </section>
           )}
 
-          <section className="reader-pane" aria-label="阅读器">
+          <section className="reader-pane" aria-label="阅读器" aria-disabled={!authDecision.canUseAccountFeatures}>
             <div className="reader-header">
               <div>
                 <p className="eyebrow">示例章节</p>

@@ -379,3 +379,36 @@ button:hover {
     color: #e5ce8c;
   }
 }
+
+.login-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid #8dc7e8;
+  border-radius: 8px;
+  background: #eef8fd;
+  color: #16445c;
+}
+
+.login-panel p {
+  margin: 0;
+  color: #365e70;
+}
+
+.content-grid--disabled .reader-pane {
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .login-panel {
+    background: #183141;
+    border-color: #2f6f91;
+    color: #c9ecff;
+  }
+
+  .login-panel p {
+    color: #a9d2e6;
+  }
+}

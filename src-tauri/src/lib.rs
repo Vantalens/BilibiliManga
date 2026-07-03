@@ -64,6 +64,11 @@ fn official_manga_url() -> &'static str {
 }
 
 #[tauri::command]
+fn official_login_url() -> &'static str {
+    "https://passport.bilibili.com/login"
+}
+
+#[tauri::command]
 async fn search_suggestions(
     term: String,
     limit: Option<u8>,
@@ -395,6 +400,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_app_status,
             official_manga_url,
+            official_login_url,
             search_suggestions,
             storage_security_status,
             initialize_secure_storage,

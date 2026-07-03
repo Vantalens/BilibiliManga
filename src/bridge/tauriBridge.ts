@@ -137,6 +137,11 @@ export async function openOfficialMangaPage(): Promise<void> {
   const url = await invoke<string>("official_manga_url");
   await openUrl(url);
 }
+
+export async function openOfficialLoginPage(): Promise<void> {
+  const url = await invoke<string>("official_login_url");
+  await openUrl(url);
+}
 export async function openOfficialSearchPage(keyword: string): Promise<void> {
   const baseUrl = await invoke<string>("official_manga_url");
   const url = new URL("search", baseUrl);
