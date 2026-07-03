@@ -16,3 +16,8 @@ coverage/
 !.env.example
 
 .temp-bilibili-app/
+
+# Test files - DO NOT COMMIT
+test-cookie.txt
+test-response.json
+*.cookie

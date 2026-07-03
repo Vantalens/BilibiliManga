@@ -19,6 +19,7 @@ import {
   type StorageSecurityStatus,
   type StoredLibraryItem
 } from "./bridge/tauriBridge";
+import { ApiTestPanel } from "./components/ApiTestPanel";
 import { decideAuth, refreshAuthAfterOfficialLogin, type AuthState } from "./domain/auth";
 import { decideEntitlement, refreshEntitlementAfterOfficialWeb, type EntitlementState } from "./domain/entitlement";
 import { filterLibraryItems, summarizeLibrary, type LibraryItem } from "./domain/library";
@@ -411,6 +412,11 @@ export default function App() {
             )}
           </section>
         </div>
+
+        {/* API 测试面板 - 用于快速验证真实 Cookie */}
+        {authDecision.canUseAccountFeatures && (
+          <ApiTestPanel />
+        )}
       </section>
     </main>
   );
