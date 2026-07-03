@@ -449,24 +449,33 @@ pub async fn fetch_class_page(
         is_free: -1,   // All types
     };
 
+    // Debug: print request for troubleshooting
+    eprintln!("ClassPage request: {:?}", request_body);
+
     let response = client
         .post(CLASS_PAGE_ENDPOINT)
         .header("Content-Type", "application/json")
         .header("Origin", OFFICIAL_ORIGIN)
-        .header("Referer", OFFICIAL_ORIGIN)
+        .header("Referer", "https://manga.bilibili.com/classify")
         .header("User-Agent", USER_AGENT)
+        .header("x-bili-manga-from", "c-int-v1")
         .json(&request_body)
         .send()
         .await
         .map_err(|error| ApiError::Transport(error.to_string()))?;
 
+    eprintln!("ClassPage response status: {}", response.status());
+
     if !response.status().is_success() {
         return Err(ApiError::Status(response.status().as_u16()));
     }
 
-    let envelope: TwirpEnvelope<ClassPageData> = response
-        .json()
-        .await
+    let text = response.text().await
+        .map_err(|error| ApiError::Schema(error.to_string()))?;
+
+    eprintln!("ClassPage response body: {}", text);
+
+    let envelope: TwirpEnvelope<ClassPageData> = serde_json::from_str(&text)
         .map_err(|error| ApiError::Schema(error.to_string()))?;
 
     if envelope.code != 0 {
