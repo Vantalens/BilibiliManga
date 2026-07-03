@@ -110,25 +110,28 @@ export function MangaPurchasedPage() {
                       src={comic.vcover}
                       alt={comic.comic_title}
                       onError={(e) => {
-                        e.currentTarget.src = `https://via.placeholder.com/180x240/667eea/ffffff?text=${encodeURIComponent(comic.comic_title)}`;
+                        // 图片加载失败时，隐藏 img 标签，显示 div 占位符
+                        e.currentTarget.style.display = 'none';
+                        const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (placeholder) placeholder.style.display = 'flex';
                       }}
                     />
-                  ) : (
-                    <div style={{
-                      width: "100%",
-                      height: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                      color: "white",
-                      fontSize: "12px",
-                      padding: "12px",
-                      textAlign: "center"
-                    }}>
-                      {comic.comic_title}
-                    </div>
-                  )}
+                  ) : null}
+                  <div style={{
+                    width: "100%",
+                    height: "100%",
+                    display: comic.vcover ? "none" : "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "linear-gradient(135deg, #fb7299 0%, #00a1d6 100%)",
+                    color: "white",
+                    fontSize: "12px",
+                    padding: "12px",
+                    textAlign: "center",
+                    fontWeight: "bold"
+                  }}>
+                    {comic.comic_title}
+                  </div>
 
                   {comic.enable_auto_pay && (
                     <div className="comic-badge">自动购买</div>

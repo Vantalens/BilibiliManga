@@ -33,7 +33,7 @@ export function MangaHomePage() {
   const recommendComics: Comic[] = Array(12).fill(null).map((_, i) => ({
     id: i + 100,
     title: `推荐漫画 ${i + 1}`,
-    cover: `https://via.placeholder.com/200x267/FB7299/FFFFFF?text=Comic+${i + 1}`,
+    cover: "", // 空字符串，将显示渐变色占位符
     latest: `${Math.floor(Math.random() * 100)}话`,
     badge: i % 3 === 0 ? "完结" : i % 3 === 1 ? "更新" : undefined
   }));
@@ -68,13 +68,25 @@ export function MangaHomePage() {
           {recommendComics.map((comic) => (
             <div key={comic.id} className="comic-card">
               <div className="comic-cover">
-                <img
-                  src={comic.cover || `https://via.placeholder.com/180x240/667eea/ffffff?text=${encodeURIComponent(comic.title)}`}
-                  alt={comic.title}
-                  onError={(e) => {
-                    e.currentTarget.src = `https://via.placeholder.com/180x240/667eea/ffffff?text=${encodeURIComponent(comic.title)}`;
-                  }}
-                />
+                {comic.cover ? (
+                  <img src={comic.cover} alt={comic.title} />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    background: 'linear-gradient(135deg, #fb7299 0%, #00a1d6 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    padding: '12px',
+                    textAlign: 'center'
+                  }}>
+                    {comic.title}
+                  </div>
+                )}
                 {comic.badge && (
                   <div className="comic-badge">{comic.badge}</div>
                 )}
