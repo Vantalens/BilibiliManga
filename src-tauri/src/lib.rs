@@ -114,6 +114,30 @@ fn get_reading_progress(
 }
 
 #[tauri::command]
+fn upsert_reader_preferences(
+    app: tauri::AppHandle,
+    preferences: storage::StoredReaderPreferences,
+) -> Result<(), String> {
+    let (database_path, database_key) = encrypted_database_context(&app)?;
+    storage::initialize_encrypted_database(&database_path, &database_key)
+        .map_err(|error| error.to_string())?;
+    storage::upsert_reader_preferences(&database_path, &database_key, &preferences)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn get_reader_preferences(
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<Option<storage::StoredReaderPreferences>, String> {
+    let (database_path, database_key) = encrypted_database_context(&app)?;
+    storage::initialize_encrypted_database(&database_path, &database_key)
+        .map_err(|error| error.to_string())?;
+    storage::get_reader_preferences(&database_path, &database_key, &id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn clear_image_cache(app: tauri::AppHandle) -> Result<CacheClearResult, String> {
     let cache_dir = app
         .path()
@@ -153,6 +177,8 @@ pub fn run() {
             list_library_items,
             upsert_reading_progress,
             get_reading_progress,
+            upsert_reader_preferences,
+            get_reader_preferences,
             clear_image_cache
         ])
         .run(tauri::generate_context!())

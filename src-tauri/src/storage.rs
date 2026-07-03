@@ -21,6 +21,14 @@ pub struct StoredReadingProgress {
     pub updated_at: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoredReaderPreferences {
+    pub id: String,
+    pub mode: String,
+    pub immersive: bool,
+    pub updated_at: i64,
+}
+
 pub fn initialize_encrypted_database(path: &Path, key: &str) -> SqlResult<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -51,6 +59,12 @@ pub fn initialize_encrypted_database(path: &Path, key: &str) -> SqlResult<()> {
           size_bytes INTEGER NOT NULL,
           last_accessed_at INTEGER NOT NULL,
           expires_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS reader_preferences (
+          id TEXT PRIMARY KEY,
+          mode TEXT NOT NULL DEFAULT 'scroll',
+          immersive INTEGER NOT NULL DEFAULT 0,
+          updated_at INTEGER NOT NULL
         );
         ",
     )?;
@@ -162,6 +176,61 @@ pub fn get_reading_progress(
     }
 }
 
+pub fn upsert_reader_preferences(
+    path: &Path,
+    key: &str,
+    preferences: &StoredReaderPreferences,
+) -> SqlResult<()> {
+    let connection = open_encrypted_connection(path, key)?;
+    connection.execute(
+        "
+        INSERT INTO reader_preferences (id, mode, immersive, updated_at)
+        VALUES (?1, ?2, ?3, ?4)
+        ON CONFLICT(id) DO UPDATE SET
+          mode = excluded.mode,
+          immersive = excluded.immersive,
+          updated_at = excluded.updated_at
+        ",
+        params![
+            preferences.id,
+            preferences.mode,
+            preferences.immersive,
+            preferences.updated_at
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn get_reader_preferences(
+    path: &Path,
+    key: &str,
+    id: &str,
+) -> SqlResult<Option<StoredReaderPreferences>> {
+    let connection = open_encrypted_connection(path, key)?;
+    let result = connection.query_row(
+        "
+        SELECT id, mode, immersive, updated_at
+        FROM reader_preferences
+        WHERE id = ?1
+        ",
+        [id],
+        |row| {
+            Ok(StoredReaderPreferences {
+                id: row.get(0)?,
+                mode: row.get(1)?,
+                immersive: row.get(2)?,
+                updated_at: row.get(3)?,
+            })
+        },
+    );
+
+    match result {
+        Ok(preferences) => Ok(Some(preferences)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 #[cfg(test)]
 pub fn count_rows_with_key(path: &Path, key: &str, table_name: &str) -> SqlResult<i64> {
     validate_table_name(table_name)?;
@@ -182,7 +251,12 @@ fn open_encrypted_connection(path: &Path, key: &str) -> SqlResult<Connection> {
 
 #[cfg(test)]
 fn validate_table_name(table_name: &str) -> SqlResult<()> {
-    let allowed = ["library_items", "reading_progress", "cache_entries"];
+    let allowed = [
+        "library_items",
+        "reading_progress",
+        "cache_entries",
+        "reader_preferences",
+    ];
     if allowed.contains(&table_name) {
         Ok(())
     } else {
@@ -279,6 +353,33 @@ mod tests {
         upsert_reading_progress(&path, key, &second).expect("progress should update");
         let stored =
             get_reading_progress(&path, key, &first.id).expect("progress query should work");
+
+        assert_eq!(stored, Some(second));
+    }
+
+    #[test]
+    fn reader_preferences_are_upserted_by_id() {
+        let temp = tempfile::tempdir().expect("temp dir should exist");
+        let path = temp.path().join("bilimanga.db");
+        let key = "test-database-key";
+        initialize_encrypted_database(&path, key).expect("database should initialize");
+        let first = StoredReaderPreferences {
+            id: "default-reader".to_string(),
+            mode: "scroll".to_string(),
+            immersive: false,
+            updated_at: 100,
+        };
+        let second = StoredReaderPreferences {
+            mode: "page".to_string(),
+            immersive: true,
+            updated_at: 200,
+            ..first.clone()
+        };
+
+        upsert_reader_preferences(&path, key, &first).expect("preferences should be stored");
+        upsert_reader_preferences(&path, key, &second).expect("preferences should update");
+        let stored =
+            get_reader_preferences(&path, key, &first.id).expect("preferences query should work");
 
         assert_eq!(stored, Some(second));
     }

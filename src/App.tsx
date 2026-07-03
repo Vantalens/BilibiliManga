@@ -3,12 +3,14 @@ import {
   clearImageCache,
   getSearchSuggestions,
   getStorageSecurityStatus,
+  getStoredReaderPreferences,
   getStoredReadingProgress,
   initializeSecureStorage,
   listStoredLibraryItems,
   openOfficialMangaPage,
   openOfficialSearchPage,
   upsertStoredLibraryItem,
+  upsertStoredReaderPreferences,
   upsertStoredReadingProgress,
   type StorageSecurityStatus,
   type StoredLibraryItem
@@ -21,6 +23,7 @@ import "./styles.css";
 type ReaderMode = "scroll" | "page";
 
 const progressId = "star-sea:chapter-12";
+const readerPreferencesId = "default-reader";
 
 export default function App() {
   const [query, setQuery] = useState("");
@@ -56,7 +59,12 @@ export default function App() {
         setPageIndex(progress.page_index);
         setReaderMode(progress.mode);
       }
-      setSystemMessage("SQLCipher 数据库已初始化，书库和阅读进度将写入本地加密存储");
+      const preferences = await getStoredReaderPreferences(readerPreferencesId);
+      if (preferences) {
+        setReaderMode(preferences.mode);
+        setImmersive(preferences.immersive);
+      }
+      setSystemMessage("SQLCipher 数据库已初始化，书库、阅读进度和阅读偏好将写入本地加密存储");
     } catch (error) {
       setSystemMessage(`安全存储初始化失败：${String(error)}`);
     }
@@ -102,6 +110,7 @@ export default function App() {
       setSystemMessage(`缓存清理失败：${String(error)}`);
     }
   }
+
   async function requestSearchSuggestions() {
     const term = query.trim();
     if (!term) {
@@ -141,9 +150,29 @@ export default function App() {
     }
   }
 
+  async function persistReaderPreferences(nextMode: ReaderMode, nextImmersive: boolean) {
+    try {
+      await upsertStoredReaderPreferences({
+        id: readerPreferencesId,
+        mode: nextMode,
+        immersive: nextImmersive,
+        updated_at: Date.now()
+      });
+      setSystemMessage(`阅读偏好已写入 SQLCipher：${nextMode} · ${nextImmersive ? "沉浸" : "标准"}`);
+    } catch {
+      setSystemMessage("当前未连接本地加密数据库，阅读偏好仅保留在本次界面状态中");
+    }
+  }
+
   function changeReaderMode(nextMode: ReaderMode) {
     setReaderMode(nextMode);
     void persistProgress(pageIndex, nextMode);
+    void persistReaderPreferences(nextMode, immersive);
+  }
+
+  function changeImmersive(nextImmersive: boolean) {
+    setImmersive(nextImmersive);
+    void persistReaderPreferences(readerMode, nextImmersive);
   }
 
   function goToPage(nextPageIndex: number) {
@@ -194,7 +223,7 @@ export default function App() {
               </button>
               <button onClick={initializeStorage}>初始化安全存储</button>
               <button onClick={clearCache}>清理缓存</button>
-              <button onClick={() => setImmersive(true)}>全屏阅读</button>
+              <button onClick={() => changeImmersive(true)}>全屏阅读</button>
             </div>
           </header>
         )}
@@ -251,7 +280,7 @@ export default function App() {
               </div>
               <div className="reader-header__actions">
                 <button onClick={openOfficialMangaPage}>官方网页处理未解锁</button>
-                {immersive && <button onClick={() => setImmersive(false)}>显示 UI</button>}
+                {immersive && <button onClick={() => changeImmersive(false)}>显示 UI</button>}
               </div>
             </div>
 

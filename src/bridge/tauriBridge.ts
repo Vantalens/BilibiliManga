@@ -45,6 +45,13 @@ export interface StoredReadingProgress {
   updated_at: number;
 }
 
+export interface StoredReaderPreferences {
+  id: string;
+  mode: "scroll" | "page";
+  immersive: boolean;
+  updated_at: number;
+}
+
 export async function getAppStatus(): Promise<AppStatus> {
   return invoke<AppStatus>("get_app_status");
 }
@@ -71,6 +78,14 @@ export async function upsertStoredReadingProgress(progress: StoredReadingProgres
 
 export async function getStoredReadingProgress(id: string): Promise<StoredReadingProgress | null> {
   return invoke<StoredReadingProgress | null>("get_reading_progress", { id });
+}
+
+export async function upsertStoredReaderPreferences(preferences: StoredReaderPreferences): Promise<void> {
+  return invoke<void>("upsert_reader_preferences", { preferences });
+}
+
+export async function getStoredReaderPreferences(id: string): Promise<StoredReaderPreferences | null> {
+  return invoke<StoredReaderPreferences | null>("get_reader_preferences", { id });
 }
 
 export async function clearImageCache(): Promise<CacheClearResult> {
