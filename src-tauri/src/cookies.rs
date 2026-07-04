@@ -41,8 +41,8 @@ impl From<keyring::Error> for CookieError {
 /// Store cookies securely in system keyring
 pub fn store_cookies(cookies: &StoredCookies) -> Result<(), CookieError> {
     let entry = Entry::new(SERVICE_NAME, COOKIE_KEY)?;
-    let json = serde_json::to_string(cookies)
-        .map_err(|e| CookieError::InvalidFormat(e.to_string()))?;
+    let json =
+        serde_json::to_string(cookies).map_err(|e| CookieError::InvalidFormat(e.to_string()))?;
     entry.set_password(&json)?;
     Ok(())
 }
@@ -55,8 +55,8 @@ pub fn get_cookies() -> Result<StoredCookies, CookieError> {
         other => CookieError::KeyringError(other.to_string()),
     })?;
 
-    let cookies: StoredCookies = serde_json::from_str(&json)
-        .map_err(|e| CookieError::InvalidFormat(e.to_string()))?;
+    let cookies: StoredCookies =
+        serde_json::from_str(&json).map_err(|e| CookieError::InvalidFormat(e.to_string()))?;
 
     // Check expiration if set
     if let Some(expires_at) = cookies.expires_at {

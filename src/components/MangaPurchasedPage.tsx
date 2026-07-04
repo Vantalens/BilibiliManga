@@ -1,22 +1,65 @@
 import { useEffect, useState } from "react";
 import {
-  fetchPurchasedComics,
-  listStoredLibraryItems,
-  openOfficialMangaPage,
+  fetchUserBookshelf,
   getStoredCookies,
   hasStoredCookies,
-  type PurchasedComic,
+  listStoredLibraryItems,
+  proxyImageToDataUrl,
+  type BookshelfItem,
   type StoredLibraryItem,
 } from "../bridge/tauriBridge";
 import "../styles-manga.css";
 
-function getCoverUrl(comic: PurchasedComic): string {
-  const cover = comic.vcover || comic.scover || comic.hcover || "";
+interface MangaPurchasedPageProps {
+  onOpenComic: (comicId: number) => void;
+}
+
+function getRemoteCoverUrl(item: BookshelfItem): string {
+  const cover = item.vertical_cover || "";
   return cover.startsWith("//") ? "https:" + cover : cover;
 }
 
-export function MangaPurchasedPage() {
-  const [comics, setComics] = useState<PurchasedComic[]>([]);
+function RemoteCover({ item }: { item: BookshelfItem }) {
+  const [source, setSource] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cover = getRemoteCoverUrl(item);
+    setSource("");
+    setFailed(false);
+
+    if (!cover) {
+      setFailed(true);
+      return;
+    }
+
+    proxyImageToDataUrl(cover)
+      .then((dataUrl) => {
+        if (!cancelled) setSource(dataUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item.comic_id, item.vertical_cover]);
+
+  if (source) return <img src={source} alt={item.title} loading="lazy" />;
+  if (failed) return <div className="cover-fallback">{item.title}</div>;
+  return <div className="cover-loading" aria-label="封面加载中" />;
+}
+
+function comicIdFromLocalItem(item: StoredLibraryItem): number | null {
+  if (!item.id.startsWith("manga:")) return null;
+  const id = Number(item.id.slice("manga:".length));
+  return Number.isFinite(id) ? id : null;
+}
+
+export function MangaPurchasedPage({ onOpenComic }: MangaPurchasedPageProps) {
+  const [remoteItems, setRemoteItems] = useState<BookshelfItem[]>([]);
   const [localItems, setLocalItems] = useState<StoredLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
@@ -40,41 +83,40 @@ export function MangaPurchasedPage() {
         setNotice(
           storedItems.length > 0
             ? "官网书架暂时没有同步，本机书架仍可使用。"
-            : "可以先从首页把漫画加入书架；登录和购买仍在哔哩哔哩漫画官网完成。"
+            : "可以先从首页把漫画加入书架；登录后会同步哔哩哔哩漫画书架。"
         );
-        setLoading(false);
+        setHasMore(false);
         return;
       }
 
       const stored = await getStoredCookies();
-      const result = await fetchPurchasedComics(targetPage, 15, stored.raw_cookie);
+      const result = await fetchUserBookshelf(targetPage, 15, stored.raw_cookie);
 
       if (targetPage === 1) {
-        setComics(result.items);
+        setRemoteItems(result.items);
       } else {
-        setComics((prev) => [...prev, ...result.items]);
+        setRemoteItems((prev) => [...prev, ...result.items]);
       }
 
-      setHasMore(result.items.length === 15);
+      setHasMore(result.has_more);
     } catch (err) {
       console.error("load bookshelf failed:", err);
-      setNotice("官网书架暂时没有同步，本机书架仍可使用。");
+      setNotice("官网书架暂时没有同步，本机书架仍可使用。登录过期时请重新扫码登录。");
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
   };
 
   const refresh = () => {
-    setComics([]);
+    setRemoteItems([]);
     setPage(1);
     void loadBookshelf(1);
   };
 
-  const localComicIds = new Set(
-    localItems.map((item) => (item.id.startsWith("manga:") ? Number(item.id.slice("manga:".length)) : NaN)).filter(Number.isFinite)
-  );
-  const remoteComics = comics.filter((comic) => !localComicIds.has(comic.comic_id));
-  const totalCount = localItems.length + remoteComics.length;
+  const localComicIds = new Set(localItems.map(comicIdFromLocalItem).filter((id): id is number => id !== null));
+  const remoteOnlyItems = remoteItems.filter((item) => !localComicIds.has(item.comic_id));
+  const totalCount = localItems.length + remoteOnlyItems.length;
 
   return (
     <section className="feed-page">
@@ -84,9 +126,6 @@ export function MangaPurchasedPage() {
           <p>{totalCount > 0 ? "共 " + totalCount + " 部漫画" : "你正在看的漫画会放在这里"}</p>
         </div>
         <div className="section-actions">
-          <button className="ghost-button" onClick={() => void openOfficialMangaPage()} type="button">
-            打开官网
-          </button>
           <button className="ghost-button" onClick={refresh} disabled={loading} type="button">
             刷新
           </button>
@@ -110,39 +149,48 @@ export function MangaPurchasedPage() {
       {!loading && totalCount === 0 && (
         <div className="state-page state-page--inline">
           <h2>书架暂时为空</h2>
-          <p>可以从首页把漫画加入书架；登录和购买都在哔哩哔哩漫画官网完成。</p>
+          <p>可以从首页把漫画加入书架；登录后会同步哔哩哔哩漫画书架。</p>
         </div>
       )}
 
       {totalCount > 0 && (
         <>
           <div className="comic-grid">
-            {localItems.map((item) => (
-              <article className="comic-card" key={item.id}>
-                <div className="comic-thumb">
-                  <div className="cover-fallback">{item.title}</div>
-                  <span className="comic-status">书架</span>
-                </div>
-                <h3 className="comic-title">{item.title}</h3>
-                <p className="comic-meta">{item.tags.length > 0 ? item.tags.join(" · ") : "本机书架"}</p>
-              </article>
-            ))}
-
-            {remoteComics.map((comic) => {
-              const cover = getCoverUrl(comic);
+            {localItems.map((item) => {
+              const comicId = comicIdFromLocalItem(item);
               return (
-                <article className="comic-card" key={comic.comic_id}>
-                  <div className="comic-thumb">
-                    {cover ? <img src={cover} alt={comic.comic_title} loading="lazy" /> : <div className="cover-fallback">{comic.comic_title}</div>}
-                    <span className="comic-status">书架</span>
-                  </div>
-                  <h3 className="comic-title">{comic.comic_title}</h3>
-                  <p className="comic-meta">
-                    可读 {comic.bought_ep_count ?? 0} 话{comic.last_short_title ? " · " + comic.last_short_title : ""}
-                  </p>
+                <article className="comic-card comic-card--clickable" key={item.id}>
+                  <button
+                    className="comic-open"
+                    disabled={comicId === null}
+                    onClick={() => comicId !== null && onOpenComic(comicId)}
+                    type="button"
+                  >
+                    <div className="comic-thumb">
+                      <div className="cover-fallback">{item.title}</div>
+                      <span className="comic-status">本机</span>
+                    </div>
+                    <h3 className="comic-title">{item.title}</h3>
+                    <p className="comic-meta">{item.tags.length > 0 ? item.tags.join(" · ") : "本机书架"}</p>
+                  </button>
                 </article>
               );
             })}
+
+            {remoteOnlyItems.map((item) => (
+              <article className="comic-card comic-card--clickable" key={item.comic_id}>
+                <button className="comic-open" type="button" onClick={() => onOpenComic(item.comic_id)}>
+                  <div className="comic-thumb">
+                    <RemoteCover item={item} />
+                    <span className="comic-status">书架</span>
+                  </div>
+                  <h3 className="comic-title">{item.title}</h3>
+                  <p className="comic-meta">
+                    {item.last_short_title || (item.last_ord ? "第 " + item.last_ord + " 话" : item.styles?.join(" · ") || "官网书架")}
+                  </p>
+                </button>
+              </article>
+            ))}
           </div>
 
           {hasMore && (

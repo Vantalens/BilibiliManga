@@ -220,6 +220,11 @@ export async function getStoredReadingProgress(id: string): Promise<StoredReadin
   return invoke<StoredReadingProgress | null>("get_reading_progress", { id });
 }
 
+
+export async function listStoredReadingProgress(limit?: number): Promise<StoredReadingProgress[]> {
+  return invoke<StoredReadingProgress[]>("list_reading_progress", { limit });
+}
+
 export async function upsertStoredReaderPreferences(preferences: StoredReaderPreferences): Promise<void> {
   return invoke<void>("upsert_reader_preferences", { preferences });
 }
@@ -268,16 +273,16 @@ export async function fetchClassPage(
   return invoke<ClassPageResult>("fetch_class_page", { styleId, pageNum, pageSize });
 }
 
-export async function searchComics(keyword: string, pageSize: number): Promise<ComicSearchResult> {
-  return invoke<ComicSearchResult>("search_comics", { keyword, pageSize });
+export async function searchComics(keyword: string, pageSize: number, cookies?: string): Promise<ComicSearchResult> {
+  return invoke<ComicSearchResult>("search_comics", { keyword, pageSize, cookies });
 }
 
 export async function fetchComicDetail(comicId: number): Promise<ComicDetailResult> {
   return invoke<ComicDetailResult>("fetch_comic_detail", { comicId });
 }
 
-export async function fetchEpisodeImages(epId: number, cookies?: string): Promise<EpisodeImagesResult> {
-  return invoke<EpisodeImagesResult>("fetch_episode_images", { epId, cookies });
+export async function fetchEpisodeImages(comicId: number, epId: number, cookies?: string): Promise<EpisodeImagesResult> {
+  return invoke<EpisodeImagesResult>("fetch_episode_images", { comicId, epId, cookies });
 }
 
 export async function proxyImageToDataUrl(url: string): Promise<string> {

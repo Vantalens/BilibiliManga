@@ -41,19 +41,21 @@
 
 ## In Progress
 
-- 阶段 3：真实哔哩哔哩漫画接口调研继续推进；登录、公开分类、公开详情已进入应用内路径，章节图片接口仍被官方 `code=99` 校验阻断，需继续定位真实阅读上下文。
+- 阶段 3：真实哔哩哔哩漫画接口调研继续推进；登录、公开分类、公开详情、登录态搜索、书架同步和本机最近阅读已进入应用内路径；章节图片接口已按参考实现改为表单请求，但仍需真实 Cookie 验证。
 
 ## Next
 
-- 用真实账号抓取官网阅读页的 `GetImageIndex` / `ImageToken` 请求上下文，确认是否需要额外参数、Referer、CSRF、Cookie 字段或移动端接口。
-- 将已验证的真实书架、历史、进度接口映射到 SQLCipher 数据库。
+- 用真实账号验证 `GetImageIndex` / `ImageToken` 表单请求在扫码登录 Cookie 下是否返回图片列表和 token。
+- 用真实账号验证 `Search` 和 `ListFavorite` 在应用内的稳定性、分页和失败模式。
+- 继续补官网阅读历史同步；当前“最近”先使用本机 SQLCipher 阅读进度。
 - 配置 updater 签名私钥、公钥和 HTTPS 更新源。
 - 做真实 Windows GUI 路径验证，包括安装、启动、初始化安全存储、清理缓存、阅读器模式切换。
 
 ## Blockers
 
 - `GetImageIndex` 当前真实冒烟仍返回 `code=99`，无法声明章节图片应用内阅读已稳定可用。
-- 尚未完成真实登录账号路径调研，无法声明书架、历史、图片和进度接口可稳定使用。
+- 真实账号路径下的书架、搜索、图片接口仍需人工 GUI 验收；当前自动化只覆盖请求构造和响应解析。
+- 官网历史同步接口尚未接入；当前使用本机阅读进度。
 - 尚未配置 updater 签名私钥、公钥和更新源；当前只能生成内测安装包。
 - 尚未完成真实账号连续阅读 1-2 小时验证。
 
@@ -81,3 +83,8 @@
 - 已新增应用内漫画详情页：从 `https://manga.bilibili.com/m/detail/mc{id}` 的 `vike_pageContext` 解析漫画信息和章节目录。
 - 已新增应用内阅读页入口：免费/已解锁候选章节会调用 `GetImageIndex` + `ImageToken`；锁定章节不会获取图片。
 - 已实际冒烟：`/m/detail/mc33354` 返回 200 且包含 `vike_pageContext`；`GetImageIndex` 对当前无有效上下文请求仍返回 `{"code":99,"msg":"请求失败,请稍后重试。"}`，因此不能声明章节图片闭环已完成。
+
+- 已参考 `Zeal-L/BiliBili-Manga-Downloader` 的官方 B 站解析路径，将 `Search`、`ComicDetail`、`GetImageIndex`、`ImageToken` 的请求方式从 JSON 修正为 `application/x-www-form-urlencoded` 表单模式；未接入其 BiliPlus/未解锁下载路径。
+- 已将登录态搜索接入官方 `Search`，失败时回退公开分类索引，搜索不再跳转官网。
+- 已将书架页主路径改为 `bookshelf.v1.Bookshelf/ListFavorite`，并保留本机书架兜底；书架卡片进入应用内详情。
+- 已新增本机“最近”页：从 SQLCipher `reading_progress` 列表读取最近阅读并可回到应用内漫画详情。

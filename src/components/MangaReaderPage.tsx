@@ -52,8 +52,8 @@ export function MangaReaderPage({ detail, episode, onBack }: MangaReaderPageProp
     setLoading(true);
     setError(null);
     getStoredCookies()
-      .then((stored) => fetchEpisodeImages(episode.id, stored.raw_cookie))
-      .catch(() => fetchEpisodeImages(episode.id))
+      .then((stored) => fetchEpisodeImages(detail.id, episode.id, stored.raw_cookie))
+      .catch(() => fetchEpisodeImages(detail.id, episode.id))
       .then((result) => {
         setImages(result.images);
         return upsertStoredReadingProgress({

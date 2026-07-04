@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { proxyImageToDataUrl, searchComics, type ClassPageComic } from "../bridge/tauriBridge";
+import { getStoredCookies, proxyImageToDataUrl, searchComics, type ClassPageComic } from "../bridge/tauriBridge";
 
 interface SearchResultsPageProps {
   keyword: string;
@@ -60,7 +60,9 @@ export function SearchResultsPage({ keyword, onOpenComic }: SearchResultsPagePro
 
     setLoading(true);
     setError(null);
-    searchComics(normalized, 40)
+    getStoredCookies()
+      .then((stored) => searchComics(normalized, 40, stored.raw_cookie))
+      .catch(() => searchComics(normalized, 40))
       .then((result) => setComics(result.comics))
       .catch((err) => {
         console.error("search comics failed:", err);

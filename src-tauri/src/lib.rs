@@ -109,8 +109,12 @@ async fn fetch_class_page(
 }
 
 #[tauri::command]
-async fn search_comics(keyword: String, page_size: i32) -> Result<api::ComicSearchResult, String> {
-    api::search_comics(keyword, page_size)
+async fn search_comics(
+    keyword: String,
+    page_size: i32,
+    cookies: Option<String>,
+) -> Result<api::ComicSearchResult, String> {
+    api::search_comics(keyword, page_size, cookies)
         .await
         .map_err(|error| error.to_string())
 }
@@ -124,10 +128,11 @@ async fn fetch_comic_detail(comic_id: i64) -> Result<api::ComicDetailResult, Str
 
 #[tauri::command]
 async fn fetch_episode_images(
+    comic_id: i64,
     ep_id: i64,
     cookies: Option<String>,
 ) -> Result<api::EpisodeImagesResult, String> {
-    api::fetch_episode_images(ep_id, cookies)
+    api::fetch_episode_images(comic_id, ep_id, cookies)
         .await
         .map_err(|error| error.to_string())
 }
@@ -166,22 +171,18 @@ async fn fetch_user_bookshelf(
 
 #[tauri::command]
 fn store_cookies_secure(raw_cookie: String) -> Result<(), String> {
-    let parsed = cookies::parse_cookie_string(&raw_cookie)
-        .map_err(|e| e.to_string())?;
-    cookies::store_cookies(&parsed)
-        .map_err(|e| e.to_string())
+    let parsed = cookies::parse_cookie_string(&raw_cookie).map_err(|e| e.to_string())?;
+    cookies::store_cookies(&parsed).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_stored_cookies() -> Result<cookies::StoredCookies, String> {
-    cookies::get_cookies()
-        .map_err(|e| e.to_string())
+    cookies::get_cookies().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn delete_stored_cookies() -> Result<(), String> {
-    cookies::delete_cookies()
-        .map_err(|e| e.to_string())
+    cookies::delete_cookies().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -245,6 +246,18 @@ fn get_reading_progress(
     storage::initialize_encrypted_database(&database_path, &database_key)
         .map_err(|error| error.to_string())?;
     storage::get_reading_progress(&database_path, &database_key, &id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_reading_progress(
+    app: tauri::AppHandle,
+    limit: Option<i64>,
+) -> Result<Vec<storage::StoredReadingProgress>, String> {
+    let (database_path, database_key) = encrypted_database_context(&app)?;
+    storage::initialize_encrypted_database(&database_path, &database_key)
+        .map_err(|error| error.to_string())?;
+    storage::list_reading_progress(&database_path, &database_key, limit.unwrap_or(50))
         .map_err(|error| error.to_string())
 }
 
@@ -533,6 +546,7 @@ pub fn run() {
             list_library_items,
             upsert_reading_progress,
             get_reading_progress,
+            list_reading_progress,
             upsert_reader_preferences,
             get_reader_preferences,
             record_image_cache_entry,

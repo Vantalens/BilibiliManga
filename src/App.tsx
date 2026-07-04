@@ -5,6 +5,7 @@ import { LoginPage } from "./components/LoginPage";
 import { SearchResultsPage } from "./components/SearchResultsPage";
 import { MangaDetailPage } from "./components/MangaDetailPage";
 import { MangaReaderPage } from "./components/MangaReaderPage";
+import { MangaHistoryPage } from "./components/MangaHistoryPage";
 import { getSearchSuggestions, type ComicDetailResult, type ComicEpisode } from "./bridge/tauriBridge";
 import { normalizeSearchKeyword } from "./domain/search";
 import "./styles-manga.css";
@@ -155,7 +156,7 @@ export default function App() {
         <main className="app-main">
           {activePage === "home" && <MangaHomePage onOpenComic={openComic} />}
           {activePage === "login" && <LoginPage />}
-          {activePage === "bookshelf" && <MangaPurchasedPage />}
+          {activePage === "bookshelf" && <MangaPurchasedPage onOpenComic={openComic} />}
           {activePage === "search" && <SearchResultsPage keyword={searchKeyword} onOpenComic={openComic} />}
           {activePage === "detail" && selectedComicId !== null && (
             <MangaDetailPage comicId={selectedComicId} onBack={() => setActivePage("home")} onReadEpisode={openReader} />
@@ -167,12 +168,7 @@ export default function App() {
               onBack={() => setActivePage("detail")}
             />
           )}
-          {activePage === "history" && (
-            <section className="state-page">
-              <h2>最近阅读</h2>
-              <p>阅读历史会优先使用本机保存的进度；官网同步稍后接入。</p>
-            </section>
-          )}
+          {activePage === "history" && <MangaHistoryPage onOpenComic={openComic} />}
         </main>
       </div>
     </div>

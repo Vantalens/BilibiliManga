@@ -240,6 +240,34 @@ pub fn get_reading_progress(
     }
 }
 
+pub fn list_reading_progress(
+    path: &Path,
+    key: &str,
+    limit: i64,
+) -> SqlResult<Vec<StoredReadingProgress>> {
+    let connection = open_encrypted_connection(path, key)?;
+    let mut statement = connection.prepare(
+        "
+        SELECT id, manga_id, chapter_id, page_index, mode, updated_at
+        FROM reading_progress
+        ORDER BY updated_at DESC
+        LIMIT ?1
+        ",
+    )?;
+    let rows = statement.query_map([limit.max(1).min(200)], |row| {
+        Ok(StoredReadingProgress {
+            id: row.get(0)?,
+            manga_id: row.get(1)?,
+            chapter_id: row.get(2)?,
+            page_index: row.get(3)?,
+            mode: row.get(4)?,
+            updated_at: row.get(5)?,
+        })
+    })?;
+
+    rows.collect()
+}
+
 pub fn upsert_reader_preferences(
     path: &Path,
     key: &str,
@@ -493,6 +521,50 @@ mod tests {
             get_reading_progress(&path, key, &first.id).expect("progress query should work");
 
         assert_eq!(stored, Some(second));
+    }
+
+    #[test]
+    fn reading_progress_can_be_listed_by_recent_update() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("history.db");
+        let key = "test-key";
+        initialize_encrypted_database(&path, key).expect("database should initialize");
+
+        upsert_reading_progress(
+            &path,
+            key,
+            &StoredReadingProgress {
+                id: "older".to_string(),
+                manga_id: "1".to_string(),
+                chapter_id: "10".to_string(),
+                page_index: 0,
+                mode: "scroll".to_string(),
+                updated_at: 100,
+            },
+        )
+        .expect("older progress stored");
+        upsert_reading_progress(
+            &path,
+            key,
+            &StoredReadingProgress {
+                id: "newer".to_string(),
+                manga_id: "2".to_string(),
+                chapter_id: "20".to_string(),
+                page_index: 1,
+                mode: "page".to_string(),
+                updated_at: 200,
+            },
+        )
+        .expect("newer progress stored");
+
+        let items = list_reading_progress(&path, key, 10).expect("progress list should load");
+        assert_eq!(
+            items
+                .iter()
+                .map(|item| item.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["newer", "older"]
+        );
     }
 
     #[test]
