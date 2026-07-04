@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   fetchPurchasedComics,
+  listStoredLibraryItems,
   openOfficialMangaPage,
   getStoredCookies,
   hasStoredCookies,
   type PurchasedComic,
+  type StoredLibraryItem,
 } from "../bridge/tauriBridge";
 import "../styles-manga.css";
 
@@ -15,23 +17,31 @@ function getCoverUrl(comic: PurchasedComic): string {
 
 export function MangaPurchasedPage() {
   const [comics, setComics] = useState<PurchasedComic[]>([]);
+  const [localItems, setLocalItems] = useState<StoredLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
-    void loadPurchasedComics(page);
+    void loadBookshelf(page);
   }, [page]);
 
-  const loadPurchasedComics = async (targetPage: number) => {
+  const loadBookshelf = async (targetPage: number) => {
     setLoading(true);
-    setError(null);
+    setNotice(null);
 
     try {
+      const storedItems = await listStoredLibraryItems();
+      setLocalItems(storedItems);
+
       const hasCookies = await hasStoredCookies();
       if (!hasCookies) {
-        setError("请先在哔哩哔哩漫画官网完成登录，然后回到这里刷新书架。");
+        setNotice(
+          storedItems.length > 0
+            ? "官网书架暂时没有同步，本机书架仍可使用。"
+            : "可以先从首页把漫画加入书架；登录和购买仍在哔哩哔哩漫画官网完成。"
+        );
         setLoading(false);
         return;
       }
@@ -47,7 +57,8 @@ export function MangaPurchasedPage() {
 
       setHasMore(result.items.length === 15);
     } catch (err) {
-      setError(String(err));
+      console.error("load bookshelf failed:", err);
+      setNotice("官网书架暂时没有同步，本机书架仍可使用。");
     } finally {
       setLoading(false);
     }
@@ -56,15 +67,21 @@ export function MangaPurchasedPage() {
   const refresh = () => {
     setComics([]);
     setPage(1);
-    void loadPurchasedComics(1);
+    void loadBookshelf(1);
   };
+
+  const localComicIds = new Set(
+    localItems.map((item) => (item.id.startsWith("manga:") ? Number(item.id.slice("manga:".length)) : NaN)).filter(Number.isFinite)
+  );
+  const remoteComics = comics.filter((comic) => !localComicIds.has(comic.comic_id));
+  const totalCount = localItems.length + remoteComics.length;
 
   return (
     <section className="feed-page">
       <div className="section-header">
         <div>
           <h2>书架</h2>
-          <p>{comics.length > 0 ? "已同步 " + comics.length + " 部漫画" : "你正在看的漫画会放在这里"}</p>
+          <p>{totalCount > 0 ? "共 " + totalCount + " 部漫画" : "你正在看的漫画会放在这里"}</p>
         </div>
         <div className="section-actions">
           <button className="ghost-button" onClick={() => void openOfficialMangaPage()} type="button">
@@ -76,9 +93,9 @@ export function MangaPurchasedPage() {
         </div>
       </div>
 
-      {error && <div className="notice notice--error">{error}</div>}
+      {notice && <div className="notice">{notice}</div>}
 
-      {loading && comics.length === 0 && (
+      {loading && totalCount === 0 && (
         <div className="comic-grid" aria-label="加载中">
           {Array.from({ length: 10 }, (_, index) => (
             <div className="comic-card comic-card--skeleton" key={index}>
@@ -90,17 +107,28 @@ export function MangaPurchasedPage() {
         </div>
       )}
 
-      {!loading && !error && comics.length === 0 && (
+      {!loading && totalCount === 0 && (
         <div className="state-page state-page--inline">
           <h2>书架暂时为空</h2>
-          <p>登录和购买都在哔哩哔哩漫画官网完成，完成后回到这里刷新书架。</p>
+          <p>可以从首页把漫画加入书架；登录和购买都在哔哩哔哩漫画官网完成。</p>
         </div>
       )}
 
-      {comics.length > 0 && (
+      {totalCount > 0 && (
         <>
           <div className="comic-grid">
-            {comics.map((comic) => {
+            {localItems.map((item) => (
+              <article className="comic-card" key={item.id}>
+                <div className="comic-thumb">
+                  <div className="cover-fallback">{item.title}</div>
+                  <span className="comic-status">书架</span>
+                </div>
+                <h3 className="comic-title">{item.title}</h3>
+                <p className="comic-meta">{item.tags.length > 0 ? item.tags.join(" · ") : "本机书架"}</p>
+              </article>
+            ))}
+
+            {remoteComics.map((comic) => {
               const cover = getCoverUrl(comic);
               return (
                 <article className="comic-card" key={comic.comic_id}>

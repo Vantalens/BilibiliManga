@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { fetchClassPage, type ClassPageComic } from "../bridge/tauriBridge";
+import { fetchClassPage, listStoredLibraryItems, upsertStoredLibraryItem, type ClassPageComic } from "../bridge/tauriBridge";
+import { createLibraryItemFromClassPageComic } from "../domain/bookshelf";
 import "../styles-manga.css";
 
 const categories = ["推荐", "热血", "古风", "玄幻", "恋爱", "悬疑", "都市", "校园"];
@@ -16,10 +17,25 @@ export function MangaHomePage() {
   const [comics, setComics] = useState<ClassPageComic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<number>>(() => new Set());
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
     void loadComics();
+    void loadSavedBookshelfIds();
   }, []);
+
+  const loadSavedBookshelfIds = async () => {
+    try {
+      const items = await listStoredLibraryItems();
+      const ids = items
+        .map((item) => (item.id.startsWith("manga:") ? Number(item.id.slice("manga:".length)) : NaN))
+        .filter(Number.isFinite);
+      setSavedIds(new Set(ids));
+    } catch (err) {
+      console.error("load saved bookshelf ids failed:", err);
+    }
+  };
 
   const loadComics = async () => {
     setLoading(true);
@@ -33,6 +49,18 @@ export function MangaHomePage() {
       setError("公开漫画列表暂时没有加载出来。当前只显示已同步的内容。");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveToBookshelf = async (comic: ClassPageComic) => {
+    try {
+      await upsertStoredLibraryItem(createLibraryItemFromClassPageComic(comic));
+      setSavedIds((current) => new Set(current).add(comic.id));
+      setSaveMessage("已加入书架");
+      window.setTimeout(() => setSaveMessage(null), 1600);
+    } catch (err) {
+      console.error("save bookshelf item failed:", err);
+      setError("暂时无法加入书架，请稍后再试。");
     }
   };
 
@@ -57,6 +85,7 @@ export function MangaHomePage() {
       </div>
 
       {error && <div className="notice notice--error">{error}</div>}
+      {saveMessage && <div className="notice">{saveMessage}</div>}
 
       {loading && (
         <div className="comic-grid" aria-label="加载中">
@@ -84,6 +113,14 @@ export function MangaHomePage() {
                 <p className="comic-meta">
                   {comic.last_short_title || (comic.last_ord ? "第 " + comic.last_ord + " 话" : "公开详情")}
                 </p>
+                <button
+                  className="card-action"
+                  onClick={() => void saveToBookshelf(comic)}
+                  disabled={savedIds.has(comic.id)}
+                  type="button"
+                >
+                  {savedIds.has(comic.id) ? "已在书架" : "加入书架"}
+                </button>
               </article>
             );
           })}
