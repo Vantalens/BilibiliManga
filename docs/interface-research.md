@@ -55,7 +55,7 @@
 - 响应：HTTP 200，JSON 包络为 `{"code":0,"msg":"","data":["有兽焉"]}`。
 - 当前固化：`parseSearchSuggestionsResponse` 只接受 `data` 为字符串数组；非零 `code` 映射为 server error；缺少 `code` 或 data 形态不符映射为 schema error。
 - 已新增受控后端命令 `search_suggestions(term, limit)`：只调用已验证 `SearchSug`，限制空输入、最大 80 字符和 1-20 条建议，不处理 Cookie、登录态、支付或图片。
-- UI 接入策略：书库搜索区手动请求建议，建议项只回填本地筛选关键词；失败时保留本地筛选并提供官方网页降级。
+- UI 接入策略：顶部搜索框请求建议，回车或点击建议打开官方搜索页；失败时保留输入并提示官方搜索降级。未验证关键词 `Search` 仍不进入原生调用。
 - 失败模式：`https://manga.bilibili.co/twirp/...` 在本机 TLS 握手 EOF；`http://manga.bilibili.co/twirp/...` 返回 empty reply。运行时不得硬编码依赖该裸域成功。
 
 关键词搜索：

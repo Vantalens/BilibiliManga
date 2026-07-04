@@ -179,11 +179,12 @@ button {
 }
 
 .top-search {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr 28px;
+  grid-template-columns: 1fr 32px;
   align-items: center;
   height: 44px;
-  padding: 0 12px 0 18px;
+  padding: 0 8px 0 18px;
   border-radius: 8px;
   background: var(--soft);
   color: #62666d;
@@ -202,9 +203,57 @@ button {
   color: #a6abb2;
 }
 
-.top-search span {
+.top-search button[type="submit"] {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  color: #3f434a;
   font-size: 23px;
-  text-align: center;
+  cursor: pointer;
+}
+
+.top-search button[type="submit"]:hover {
+  background: var(--hover);
+}
+
+.search-popover {
+  position: absolute;
+  top: 50px;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(28, 31, 35, 0.12);
+}
+
+.search-popover button {
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  color: var(--text-main);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.search-popover button:hover {
+  background: var(--hover);
+  color: var(--bili-pink);
+}
+
+.search-popover__status {
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .window-actions {
@@ -266,6 +315,12 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .feed-tabs {

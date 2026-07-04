@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   fetchPurchasedComics,
+  openOfficialMangaPage,
   getStoredCookies,
   hasStoredCookies,
   type PurchasedComic,
@@ -30,7 +31,7 @@ export function MangaPurchasedPage() {
     try {
       const hasCookies = await hasStoredCookies();
       if (!hasCookies) {
-        setError("需要先登录后才能同步已购列表。未购买漫画仍可通过推荐和搜索浏览公开信息。");
+        setError("请先在哔哩哔哩漫画官网完成登录，然后回到这里刷新书架。");
         setLoading(false);
         return;
       }
@@ -62,12 +63,17 @@ export function MangaPurchasedPage() {
     <section className="feed-page">
       <div className="section-header">
         <div>
-          <h2>我的已购</h2>
-          <p>{comics.length > 0 ? "已同步 " + comics.length + " 部漫画" : "登录后同步已购漫画"}</p>
+          <h2>书架</h2>
+          <p>{comics.length > 0 ? "已同步 " + comics.length + " 部漫画" : "你正在看的漫画会放在这里"}</p>
         </div>
-        <button className="ghost-button" onClick={refresh} disabled={loading} type="button">
-          刷新
-        </button>
+        <div className="section-actions">
+          <button className="ghost-button" onClick={() => void openOfficialMangaPage()} type="button">
+            打开官网
+          </button>
+          <button className="ghost-button" onClick={refresh} disabled={loading} type="button">
+            刷新
+          </button>
+        </div>
       </div>
 
       {error && <div className="notice notice--error">{error}</div>}
@@ -86,8 +92,8 @@ export function MangaPurchasedPage() {
 
       {!loading && !error && comics.length === 0 && (
         <div className="state-page state-page--inline">
-          <h2>暂无已购漫画</h2>
-          <p>同步成功前只显示真实账号数据。</p>
+          <h2>书架暂时为空</h2>
+          <p>登录和购买都在哔哩哔哩漫画官网完成，完成后回到这里刷新书架。</p>
         </div>
       )}
 
@@ -100,11 +106,11 @@ export function MangaPurchasedPage() {
                 <article className="comic-card" key={comic.comic_id}>
                   <div className="comic-thumb">
                     {cover ? <img src={cover} alt={comic.comic_title} loading="lazy" /> : <div className="cover-fallback">{comic.comic_title}</div>}
-                    <span className="comic-status">已购</span>
+                    <span className="comic-status">书架</span>
                   </div>
                   <h3 className="comic-title">{comic.comic_title}</h3>
                   <p className="comic-meta">
-                    已购 {comic.bought_ep_count ?? 0} 话{comic.last_short_title ? " · " + comic.last_short_title : ""}
+                    可读 {comic.bought_ep_count ?? 0} 话{comic.last_short_title ? " · " + comic.last_short_title : ""}
                   </p>
                 </article>
               );

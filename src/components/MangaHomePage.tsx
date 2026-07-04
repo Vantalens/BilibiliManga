@@ -30,7 +30,7 @@ export function MangaHomePage() {
     } catch (err) {
       console.error("ClassPage API failed:", err);
       setComics([]);
-      setError("公开漫画列表暂不可用。当前只显示真实接口或本地数据。");
+      setError("公开漫画列表暂时没有加载出来。当前只显示已同步的内容。");
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ export function MangaHomePage() {
       {!loading && comics.length === 0 && (
         <div className="state-page state-page--inline">
           <h2>没有可展示的漫画</h2>
-          <p>当前只展示真实接口返回或本地书库数据。</p>
+          <p>当前只展示已同步的内容和本机书架数据。</p>
         </div>
       )}
     </section>

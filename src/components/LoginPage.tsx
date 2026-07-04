@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   checkLoginStatus,
   getStoredCookies,
   deleteStoredCookies,
   hasStoredCookies,
+  openOfficialMangaPage,
   type LoginCheckResult,
 } from "../bridge/tauriBridge";
 
@@ -26,20 +26,16 @@ export function LoginPage() {
         setLoginStatus(status);
       }
     } catch (err) {
-      setError(`检查登录状态失败: ${err}`);
+      setError("暂时无法确认登录状态，请稍后再试。");
     }
   };
 
   const handleOfficialLogin = async () => {
     try {
-      // 打开官方登录页
-      await openUrl("https://passport.bilibili.com/login");
-
-      // 提示用户
+      await openOfficialMangaPage();
       setError(null);
-      alert("请在浏览器中完成登录，登录完成后点击'检查登录状态'按钮");
     } catch (err) {
-      setError(`打开登录页失败: ${err}`);
+      setError("暂时无法打开官网，请稍后再试。");
     }
   };
 
@@ -50,7 +46,7 @@ export function LoginPage() {
       setLoginStatus(null);
       setError(null);
     } catch (err) {
-      setError(`登出失败: ${err}`);
+      setError("退出登录失败，请稍后再试。");
     } finally {
       setLoading(false);
     }
@@ -59,7 +55,7 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-container">
-        <h2>登录哔哩哔哩漫画</h2>
+        <h2>我的账号</h2>
 
         {error && (
           <div className="error-message" style={{ marginBottom: '20px' }}>
@@ -70,27 +66,26 @@ export function LoginPage() {
         {loginStatus?.is_login ? (
           <div className="login-success">
             <div className="status-badge">✓ 已登录</div>
-            {loginStatus.uid && <p>用户 ID: {loginStatus.uid}</p>}
-            <button
+                        <button
               onClick={handleLogout}
               disabled={loading}
               className="logout-button"
             >
-              {loading ? "登出中..." : "登出"}
+              {loading ? "正在退出" : "退出登录"}
             </button>
           </div>
         ) : (
           <div className="login-form">
             <div className="login-description">
-              <p>点击下方按钮，将在浏览器中打开官方登录页面</p>
-              <p>登录完成后，软件会自动获取登录状态</p>
+              <p>登录、购买和账号安全操作都在哔哩哔哩漫画官网完成。</p>
+              <p>完成后回到软件刷新状态，书架会显示你正在看的漫画。</p>
             </div>
 
             <button
               onClick={handleOfficialLogin}
               className="login-button"
             >
-              前往官方网站登录
+              打开哔哩哔哩漫画官网
             </button>
 
             <button
@@ -98,15 +93,15 @@ export function LoginPage() {
               className="check-button"
               style={{ marginTop: '12px' }}
             >
-              检查登录状态
+              我已完成登录，刷新状态
             </button>
           </div>
         )}
 
         <div className="login-notice" style={{ marginTop: '24px', fontSize: '12px', color: '#999' }}>
-          <p>• 登录信息安全存储在系统密钥环中</p>
-          <p>• 不会保存密码，仅保存登录凭证</p>
-          <p>• 未购买的章节将跳转官方网页处理</p>
+          <p>• 本软件不会接管支付、购买或账号安全操作</p>
+          <p>• 未解锁章节会回到官网处理</p>
+          <p>• 书架只展示你有权访问或公开可浏览的内容</p>
         </div>
       </div>
 
@@ -174,7 +169,7 @@ export function LoginPage() {
 
         .login-button {
           padding: 14px 24px;
-          background: linear-gradient(135deg, #fb7299 0%, #00a1d6 100%);
+          background: #ff6699;
           color: white;
           border: none;
           border-radius: 8px;
