@@ -109,6 +109,13 @@ async fn fetch_class_page(
 }
 
 #[tauri::command]
+async fn proxy_image_to_data_url(url: String) -> Result<String, String> {
+    api::proxy_image_to_data_url(url)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 async fn generate_login_qrcode() -> Result<api::QrCodeResult, String> {
     api::generate_qrcode()
         .await
@@ -485,6 +492,7 @@ pub fn run() {
             check_login_status,
             fetch_purchased_comics,
             fetch_class_page,
+            proxy_image_to_data_url,
             generate_login_qrcode,
             poll_login_status,
             fetch_user_bookshelf,

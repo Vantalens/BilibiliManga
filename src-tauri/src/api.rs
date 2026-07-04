@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -6,6 +7,7 @@ const TWIRP_BASE: &str = "https://manga.bilibili.com/twirp";
 const OFFICIAL_ORIGIN: &str = "https://manga.bilibili.com";
 const PASSPORT_BASE: &str = "https://passport.bilibili.com";
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
+const MAX_PROXY_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 
 // Twirp endpoints - verified
 const SEARCH_SUGGEST_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/SearchSug?device=pc&platform=web&nov=27";
@@ -451,22 +453,26 @@ pub struct ClassPageResult {
 }
 
 pub async fn fetch_class_page(
-    _style_id: i32,
+    style_id: i32,
     _page_num: i32,
-    _page_size: i32,
+    page_size: i32,
 ) -> Result<ClassPageResult, ApiError> {
-    // ClassPage returns code 99 without authentication
-    // Instead, parse SSR data from homepage HTML (public, no auth needed)
-    fetch_homepage_ssr_data().await
+    let mut result = fetch_public_manga_page(style_id).await?;
+    if page_size > 0 {
+        result.comics.truncate(page_size as usize);
+        result.total = result.comics.len() as i32;
+    }
+    Ok(result)
 }
 
-// Parse SSR data from homepage HTML
-async fn fetch_homepage_ssr_data() -> Result<ClassPageResult, ApiError> {
+async fn fetch_public_manga_page(style_id: i32) -> Result<ClassPageResult, ApiError> {
     let client = reqwest::Client::new();
+    let url = public_manga_page_url(style_id);
 
     let response = client
-        .get("https://manga.bilibili.com/")
+        .get(url)
         .header("User-Agent", USER_AGENT)
+        .header(reqwest::header::REFERER, format!("{OFFICIAL_ORIGIN}/"))
         .send()
         .await
         .map_err(|error| ApiError::Transport(error.to_string()))?;
@@ -481,6 +487,13 @@ async fn fetch_homepage_ssr_data() -> Result<ClassPageResult, ApiError> {
         .map_err(|error| ApiError::Transport(error.to_string()))?;
 
     parse_homepage_comics(&html)
+}
+
+fn public_manga_page_url(style_id: i32) -> String {
+    if style_id < 0 {
+        return format!("{OFFICIAL_ORIGIN}/");
+    }
+    format!("{OFFICIAL_ORIGIN}/classify?styles={style_id}&areas=-1&status=-1&prices=-1&orders=0")
 }
 
 fn parse_homepage_comics(html: &str) -> Result<ClassPageResult, ApiError> {
@@ -651,6 +664,73 @@ fn string_array_from_json(value: Option<&serde_json::Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+pub async fn proxy_image_to_data_url(url: String) -> Result<String, ApiError> {
+    let normalized = normalize_proxy_image_url(&url)?;
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&normalized)
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .header(reqwest::header::REFERER, format!("{OFFICIAL_ORIGIN}/"))
+        .send()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(ApiError::Status(status.as_u16()));
+    }
+
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .filter(|value| value.starts_with("image/"))
+        .unwrap_or("image/png")
+        .to_string();
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+
+    if bytes.len() > MAX_PROXY_IMAGE_BYTES {
+        return Err(ApiError::Validation("image is too large".to_string()));
+    }
+
+    Ok(format!(
+        "data:{content_type};base64,{}",
+        general_purpose::STANDARD.encode(bytes)
+    ))
+}
+
+fn normalize_proxy_image_url(url: &str) -> Result<String, ApiError> {
+    let trimmed = url.trim();
+    let normalized = if let Some(rest) = trimmed.strip_prefix("//") {
+        format!("https://{rest}")
+    } else {
+        trimmed.to_string()
+    };
+
+    if !normalized.starts_with("https://") {
+        return Err(ApiError::Validation("image url must use https".to_string()));
+    }
+
+    let allowed = ["hdslb.com", "bilibili.com"];
+    let host = normalized
+        .strip_prefix("https://")
+        .and_then(|rest| rest.split('/').next())
+        .unwrap_or("")
+        .split(':')
+        .next()
+        .unwrap_or("");
+
+    if !allowed.iter().any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}"))) {
+        return Err(ApiError::Validation("image host is not allowed".to_string()));
+    }
+
+    Ok(normalized)
+}
+
 pub async fn generate_qrcode() -> Result<QrCodeResult, ApiError> {
     let client = reqwest::Client::new();
     let response = client
@@ -772,6 +852,25 @@ fn parse_set_cookie_header(header: &str) -> Option<Cookie> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn builds_classify_page_url_for_style() {
+        assert_eq!(
+            public_manga_page_url(999),
+            "https://manga.bilibili.com/classify?styles=999&areas=-1&status=-1&prices=-1&orders=0"
+        );
+        assert_eq!(public_manga_page_url(-1), "https://manga.bilibili.com/");
+    }
+
+    #[test]
+    fn accepts_only_bilibili_image_hosts() {
+        assert_eq!(
+            normalize_proxy_image_url("//i0.hdslb.com/bfs/manga-static/a.png").unwrap(),
+            "https://i0.hdslb.com/bfs/manga-static/a.png"
+        );
+        assert!(normalize_proxy_image_url("https://example.com/a.png").is_err());
+        assert!(normalize_proxy_image_url("http://i0.hdslb.com/a.png").is_err());
+    }
 
     #[test]
     fn parses_set_cookie_header_with_domain() {

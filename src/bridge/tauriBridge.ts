@@ -234,6 +234,10 @@ export async function fetchClassPage(
   return invoke<ClassPageResult>("fetch_class_page", { styleId, pageNum, pageSize });
 }
 
+export async function proxyImageToDataUrl(url: string): Promise<string> {
+  return invoke<string>("proxy_image_to_data_url", { url });
+}
+
 export async function generateLoginQrcode(): Promise<QrCodeResult> {
   return invoke<QrCodeResult>("generate_login_qrcode");
 }
@@ -282,5 +286,11 @@ export async function openOfficialSearchPage(keyword: string): Promise<void> {
   if (normalized) {
     url.searchParams.set("keyword", normalized);
   }
+  await openUrl(url.toString());
+}
+
+export async function openOfficialComicPage(comicId: number): Promise<void> {
+  const baseUrl = await invoke<string>("official_manga_url");
+  const url = new URL("detail/mc" + comicId, baseUrl);
   await openUrl(url.toString());
 }

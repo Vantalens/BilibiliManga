@@ -1,9 +1,25 @@
 import { useEffect, useState } from "react";
-import { fetchClassPage, listStoredLibraryItems, upsertStoredLibraryItem, type ClassPageComic } from "../bridge/tauriBridge";
+import {
+  fetchClassPage,
+  listStoredLibraryItems,
+  openOfficialComicPage,
+  proxyImageToDataUrl,
+  upsertStoredLibraryItem,
+  type ClassPageComic,
+} from "../bridge/tauriBridge";
 import { createLibraryItemFromClassPageComic } from "../domain/bookshelf";
 import "../styles-manga.css";
 
-const categories = ["推荐", "热血", "古风", "玄幻", "恋爱", "悬疑", "都市", "校园"];
+const categories = [
+  { name: "推荐", styleId: -1 },
+  { name: "热血", styleId: 999 },
+  { name: "古风", styleId: 997 },
+  { name: "玄幻", styleId: 1016 },
+  { name: "恋爱", styleId: 995 },
+  { name: "悬疑", styleId: 1023 },
+  { name: "都市", styleId: 1002 },
+  { name: "校园", styleId: 1001 },
+];
 
 function getCoverUrl(comic: ClassPageComic): string {
   if (!comic.vertical_cover) {
@@ -12,8 +28,52 @@ function getCoverUrl(comic: ClassPageComic): string {
   return comic.vertical_cover.startsWith("//") ? "https:" + comic.vertical_cover : comic.vertical_cover;
 }
 
+function ComicCover({ comic }: { comic: ClassPageComic }) {
+  const [source, setSource] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cover = getCoverUrl(comic);
+    setSource("");
+    setFailed(false);
+
+    if (!cover) {
+      setFailed(true);
+      return;
+    }
+
+    proxyImageToDataUrl(cover)
+      .then((dataUrl) => {
+        if (!cancelled) {
+          setSource(dataUrl);
+        }
+      })
+      .catch((err) => {
+        console.error("cover proxy failed:", err);
+        if (!cancelled) {
+          setFailed(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [comic.id, comic.vertical_cover]);
+
+  if (source) {
+    return <img src={source} alt={comic.title} loading="lazy" />;
+  }
+
+  if (failed) {
+    return <div className="cover-fallback">{comic.title}</div>;
+  }
+
+  return <div className="cover-loading" aria-label="封面加载中" />;
+}
+
 export function MangaHomePage() {
-  const [activeCategory, setActiveCategory] = useState("推荐");
+  const [activeCategory, setActiveCategory] = useState(categories[0]);
   const [comics, setComics] = useState<ClassPageComic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +81,10 @@ export function MangaHomePage() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadComics();
+    void loadComics(activeCategory.styleId);
+  }, [activeCategory.styleId]);
+
+  useEffect(() => {
     void loadSavedBookshelfIds();
   }, []);
 
@@ -37,16 +100,16 @@ export function MangaHomePage() {
     }
   };
 
-  const loadComics = async () => {
+  const loadComics = async (styleId = activeCategory.styleId) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchClassPage(-1, 1, 30);
+      const result = await fetchClassPage(styleId, 1, 30);
       setComics(result.comics);
     } catch (err) {
       console.error("ClassPage API failed:", err);
       setComics([]);
-      setError("公开漫画列表暂时没有加载出来。当前只显示已同步的内容。");
+      setError("公开漫画列表暂时没有加载出来，请稍后刷新。");
     } finally {
       setLoading(false);
     }
@@ -64,18 +127,28 @@ export function MangaHomePage() {
     }
   };
 
+  const openComic = async (comic: ClassPageComic) => {
+    try {
+      await openOfficialComicPage(comic.id);
+    } catch (err) {
+      console.error("open comic failed:", err);
+      setError("暂时无法打开漫画详情，请稍后再试。");
+    }
+  };
+
   return (
     <section className="feed-page">
       <div className="feed-toolbar">
         <div className="feed-tabs" aria-label="漫画分类">
           {categories.map((category) => (
             <button
-              key={category}
-              className={"feed-tab " + (activeCategory === category ? "feed-tab--active" : "")}
+              key={category.name}
+              className={"feed-tab " + (activeCategory.name === category.name ? "feed-tab--active" : "")}
               onClick={() => setActiveCategory(category)}
+              disabled={loading && activeCategory.name === category.name}
               type="button"
             >
-              {category}
+              {category.name}
             </button>
           ))}
         </div>
@@ -101,36 +174,35 @@ export function MangaHomePage() {
 
       {!loading && comics.length > 0 && (
         <div className="comic-grid">
-          {comics.map((comic) => {
-            const cover = getCoverUrl(comic);
-            return (
-              <article className="comic-card" key={comic.id}>
+          {comics.map((comic) => (
+            <article className="comic-card comic-card--clickable" key={comic.id}>
+              <button className="comic-open" onClick={() => void openComic(comic)} type="button" aria-label={"打开 " + comic.title}>
                 <div className="comic-thumb">
-                  {cover ? <img src={cover} alt={comic.title} loading="lazy" /> : <div className="cover-fallback">{comic.title}</div>}
+                  <ComicCover comic={comic} />
                   <span className="comic-status">{comic.is_finish === 1 ? "完结" : "连载"}</span>
                 </div>
                 <h3 className="comic-title">{comic.title}</h3>
                 <p className="comic-meta">
                   {comic.last_short_title || (comic.last_ord ? "第 " + comic.last_ord + " 话" : "公开详情")}
                 </p>
-                <button
-                  className="card-action"
-                  onClick={() => void saveToBookshelf(comic)}
-                  disabled={savedIds.has(comic.id)}
-                  type="button"
-                >
-                  {savedIds.has(comic.id) ? "已在书架" : "加入书架"}
-                </button>
-              </article>
-            );
-          })}
+              </button>
+              <button
+                className="card-action"
+                onClick={() => void saveToBookshelf(comic)}
+                disabled={savedIds.has(comic.id)}
+                type="button"
+              >
+                {savedIds.has(comic.id) ? "已在书架" : "加入书架"}
+              </button>
+            </article>
+          ))}
         </div>
       )}
 
       {!loading && comics.length === 0 && (
         <div className="state-page state-page--inline">
           <h2>没有可展示的漫画</h2>
-          <p>当前只展示已同步的内容和本机书架数据。</p>
+          <p>当前分类暂时没有加载到内容。</p>
         </div>
       )}
     </section>
