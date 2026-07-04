@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   fetchClassPage,
   listStoredLibraryItems,
-  openOfficialComicPage,
   proxyImageToDataUrl,
   upsertStoredLibraryItem,
   type ClassPageComic,
@@ -72,7 +71,11 @@ function ComicCover({ comic }: { comic: ClassPageComic }) {
   return <div className="cover-loading" aria-label="封面加载中" />;
 }
 
-export function MangaHomePage() {
+interface MangaHomePageProps {
+  onOpenComic: (comicId: number) => void;
+}
+
+export function MangaHomePage({ onOpenComic }: MangaHomePageProps) {
   const [activeCategory, setActiveCategory] = useState(categories[0]);
   const [comics, setComics] = useState<ClassPageComic[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,15 +130,6 @@ export function MangaHomePage() {
     }
   };
 
-  const openComic = async (comic: ClassPageComic) => {
-    try {
-      await openOfficialComicPage(comic.id);
-    } catch (err) {
-      console.error("open comic failed:", err);
-      setError("暂时无法打开漫画详情，请稍后再试。");
-    }
-  };
-
   return (
     <section className="feed-page">
       <div className="feed-toolbar">
@@ -176,7 +170,7 @@ export function MangaHomePage() {
         <div className="comic-grid">
           {comics.map((comic) => (
             <article className="comic-card comic-card--clickable" key={comic.id}>
-              <button className="comic-open" onClick={() => void openComic(comic)} type="button" aria-label={"打开 " + comic.title}>
+              <button className="comic-open" onClick={() => onOpenComic(comic.id)} type="button" aria-label={"打开 " + comic.title}>
                 <div className="comic-thumb">
                   <ComicCover comic={comic} />
                   <span className="comic-status">{comic.is_finish === 1 ? "完结" : "连载"}</span>

@@ -117,6 +117,40 @@ export interface ClassPageResult {
   total: number;
 }
 
+export interface ComicEpisode {
+  id: number;
+  ord: number;
+  short_title: string;
+  title: string;
+  cover: string;
+  is_locked: boolean;
+  is_in_free: boolean;
+  image_count: number;
+  pub_time: string;
+}
+
+export interface ComicDetailResult {
+  id: number;
+  title: string;
+  vertical_cover: string;
+  horizontal_cover: string;
+  author_name: string[];
+  styles: string[];
+  evaluate: string;
+  is_finish: number;
+  total: number;
+  episodes: ComicEpisode[];
+}
+
+export interface ComicSearchResult {
+  comics: ClassPageComic[];
+  total: number;
+}
+
+export interface EpisodeImagesResult {
+  images: string[];
+}
+
 export interface LoginCheckResult {
   is_login: boolean;
   uid?: number;
@@ -232,6 +266,18 @@ export async function fetchClassPage(
   pageSize: number
 ): Promise<ClassPageResult> {
   return invoke<ClassPageResult>("fetch_class_page", { styleId, pageNum, pageSize });
+}
+
+export async function searchComics(keyword: string, pageSize: number): Promise<ComicSearchResult> {
+  return invoke<ComicSearchResult>("search_comics", { keyword, pageSize });
+}
+
+export async function fetchComicDetail(comicId: number): Promise<ComicDetailResult> {
+  return invoke<ComicDetailResult>("fetch_comic_detail", { comicId });
+}
+
+export async function fetchEpisodeImages(epId: number, cookies?: string): Promise<EpisodeImagesResult> {
+  return invoke<EpisodeImagesResult>("fetch_episode_images", { epId, cookies });
 }
 
 export async function proxyImageToDataUrl(url: string): Promise<string> {

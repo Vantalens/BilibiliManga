@@ -109,6 +109,30 @@ async fn fetch_class_page(
 }
 
 #[tauri::command]
+async fn search_comics(keyword: String, page_size: i32) -> Result<api::ComicSearchResult, String> {
+    api::search_comics(keyword, page_size)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn fetch_comic_detail(comic_id: i64) -> Result<api::ComicDetailResult, String> {
+    api::fetch_comic_detail(comic_id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn fetch_episode_images(
+    ep_id: i64,
+    cookies: Option<String>,
+) -> Result<api::EpisodeImagesResult, String> {
+    api::fetch_episode_images(ep_id, cookies)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 async fn proxy_image_to_data_url(url: String) -> Result<String, String> {
     api::proxy_image_to_data_url(url)
         .await
@@ -492,6 +516,9 @@ pub fn run() {
             check_login_status,
             fetch_purchased_comics,
             fetch_class_page,
+            search_comics,
+            fetch_comic_detail,
+            fetch_episode_images,
             proxy_image_to_data_url,
             generate_login_qrcode,
             poll_login_status,

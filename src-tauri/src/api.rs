@@ -3,9 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 // API endpoints - base configuration
-const TWIRP_BASE: &str = "https://manga.bilibili.com/twirp";
 const OFFICIAL_ORIGIN: &str = "https://manga.bilibili.com";
-const PASSPORT_BASE: &str = "https://passport.bilibili.com";
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
 const MAX_PROXY_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 
@@ -14,9 +12,8 @@ const SEARCH_SUGGEST_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1
 
 // Twirp endpoints - to be verified with real account
 const PURCHASED_COMICS_ENDPOINT: &str = "https://manga.bilibili.com/twirp/user.v1.User/GetAutoBuyComics?device=pc&platform=web&nov=27";
-const BOOKSHELF_LIST_ENDPOINT: &str = "https://manga.bilibili.com/twirp/bookshelf.v1.Bookshelf/ListFavorite?device=pc&platform=web&nov=27";
-const COMIC_DETAIL_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail?device=pc&platform=web&nov=27";
-const CLASS_PAGE_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/ClassPage?device=pc&platform=web&nov=27";
+const IMAGE_INDEX_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/GetImageIndex?device=pc&platform=web&nov=27";
+const IMAGE_TOKEN_ENDPOINT: &str = "https://manga.bilibili.com/twirp/comic.v1.Comic/ImageToken?device=pc&platform=web&nov=27";
 const LOGIN_CHECK_ENDPOINT: &str = "https://api.bilibili.com/x/web-interface/nav";
 
 // Validation constraints
@@ -102,13 +99,6 @@ pub struct BookshelfResult {
     pub items: Vec<BookshelfItem>,
     pub total: i64,
     pub has_more: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct BookshelfRequest {
-    page_num: i32,
-    page_size: i32,
-    order: i32,
 }
 
 // Purchased comics types - based on community API documentation
@@ -394,8 +384,8 @@ pub async fn fetch_purchased_comics(
 
 // Bookshelf API - to be verified with real account
 pub async fn fetch_bookshelf(
-    page: i32,
-    page_size: i32,
+    _page: i32,
+    _page_size: i32,
     cookies: &str,
 ) -> Result<BookshelfResult, ApiError> {
     if cookies.trim().is_empty() {
@@ -412,18 +402,7 @@ pub async fn fetch_bookshelf(
 }
 
 // ClassPage API - Homepage/Category comics
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ClassPageRequest {
-    pub style_id: i32,    // -1 for all, or specific category ID
-    pub area_id: i32,     // -1 for all, 1=国漫, 2=日本, 3=韩国
-    pub is_finish: i32,   // -1 for all, 0=连载, 1=完结
-    pub order: i32,       // 0=人气, 1=更新, 2=上架时间
-    pub page_num: i32,
-    pub page_size: i32,
-    pub is_free: i32,     // -1 for all, 0=付费, 1=免费, 2=等就免费
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassPageComic {
     pub id: i64,
     pub title: String,
@@ -440,16 +419,57 @@ pub struct ClassPageComic {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ClassPageData {
-    #[serde(default)]
-    pub list: Vec<ClassPageComic>,
-    pub total: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct ClassPageResult {
     pub comics: Vec<ClassPageComic>,
     pub total: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ComicEpisode {
+    pub id: i64,
+    pub ord: f32,
+    pub short_title: String,
+    pub title: String,
+    pub cover: String,
+    pub is_locked: bool,
+    pub is_in_free: bool,
+    pub image_count: i32,
+    pub pub_time: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ComicDetailResult {
+    pub id: i64,
+    pub title: String,
+    pub vertical_cover: String,
+    pub horizontal_cover: String,
+    pub author_name: Vec<String>,
+    pub styles: Vec<String>,
+    pub evaluate: String,
+    pub is_finish: i32,
+    pub total: i32,
+    pub episodes: Vec<ComicEpisode>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ComicSearchResult {
+    pub comics: Vec<ClassPageComic>,
+    pub total: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EpisodeImagesResult {
+    pub images: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ImageIndexRequest {
+    ep_id: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct ImageTokenRequest {
+    urls: String,
 }
 
 pub async fn fetch_class_page(
@@ -731,6 +751,239 @@ fn normalize_proxy_image_url(url: &str) -> Result<String, ApiError> {
     Ok(normalized)
 }
 
+pub async fn search_comics(keyword: String, page_size: i32) -> Result<ComicSearchResult, ApiError> {
+    let normalized = keyword.trim().to_lowercase();
+    if normalized.is_empty() {
+        return Ok(ComicSearchResult { comics: Vec::new(), total: 0 });
+    }
+
+    let style_ids = [-1, 999, 997, 1016, 995, 1023, 1002, 1001];
+    let mut seen_ids = std::collections::HashSet::new();
+    let mut matched = Vec::new();
+
+    for style_id in style_ids {
+        let page = fetch_public_manga_page(style_id).await?;
+        for comic in page.comics {
+            if !seen_ids.insert(comic.id) {
+                continue;
+            }
+            let haystack = format!(
+                "{} {} {}",
+                comic.title,
+                comic.author_name.join(" "),
+                comic.styles.join(" ")
+            )
+            .to_lowercase();
+            if haystack.contains(&normalized) {
+                matched.push(comic);
+            }
+            if page_size > 0 && matched.len() >= page_size as usize {
+                let total = matched.len() as i32;
+                return Ok(ComicSearchResult { comics: matched, total });
+            }
+        }
+    }
+
+    Ok(ComicSearchResult {
+        total: matched.len() as i32,
+        comics: matched,
+    })
+}
+
+pub async fn fetch_comic_detail(comic_id: i64) -> Result<ComicDetailResult, ApiError> {
+    if comic_id <= 0 {
+        return Err(ApiError::Validation("comic id must be positive".to_string()));
+    }
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{OFFICIAL_ORIGIN}/m/detail/mc{comic_id}"))
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .header(reqwest::header::REFERER, format!("{OFFICIAL_ORIGIN}/"))
+        .send()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(ApiError::Status(status.as_u16()));
+    }
+
+    let html = response
+        .text()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+    parse_mobile_detail_page(&html)
+}
+
+fn parse_mobile_detail_page(html: &str) -> Result<ComicDetailResult, ApiError> {
+    let script_json = extract_script_json(html, "vike_pageContext")
+        .ok_or_else(|| ApiError::Schema("mobile detail page must include vike_pageContext".to_string()))?;
+    let value: serde_json::Value = serde_json::from_str(&script_json)
+        .map_err(|error| ApiError::Schema(format!("detail JSON parse error: {error}")))?;
+    let season = value
+        .get("data")
+        .and_then(|data| data.get("seasonData"))
+        .ok_or_else(|| ApiError::Schema("detail JSON must include seasonData".to_string()))?;
+
+    let episodes = season
+        .get("ep_list")
+        .and_then(|v| v.as_array())
+        .map(|items| items.iter().filter_map(parse_episode_from_json).collect::<Vec<_>>())
+        .unwrap_or_default();
+
+    Ok(ComicDetailResult {
+        id: number_value(season, "id").ok_or_else(|| ApiError::Schema("detail missing id".to_string()))? as i64,
+        title: string_value(season, "title").unwrap_or_default(),
+        vertical_cover: string_value(season, "vertical_cover").unwrap_or_default(),
+        horizontal_cover: string_value(season, "horizontal_cover").unwrap_or_default(),
+        author_name: string_array_from_json(season.get("author_name")),
+        styles: string_array_from_json(season.get("styles")),
+        evaluate: string_value(season, "evaluate").unwrap_or_default(),
+        is_finish: number_value(season, "is_finish").unwrap_or(0.0) as i32,
+        total: number_value(season, "total").unwrap_or(episodes.len() as f64) as i32,
+        episodes,
+    })
+}
+
+fn parse_episode_from_json(value: &serde_json::Value) -> Option<ComicEpisode> {
+    Some(ComicEpisode {
+        id: number_value(value, "id")? as i64,
+        ord: number_value(value, "ord").unwrap_or(0.0) as f32,
+        short_title: string_value(value, "short_title").unwrap_or_default(),
+        title: string_value(value, "title").unwrap_or_default(),
+        cover: string_value(value, "cover").unwrap_or_default(),
+        is_locked: bool_value(value, "is_locked"),
+        is_in_free: bool_value(value, "is_in_free"),
+        image_count: number_value(value, "image_count").unwrap_or(0.0) as i32,
+        pub_time: string_value(value, "pub_time").unwrap_or_default(),
+    })
+}
+
+pub async fn fetch_episode_images(ep_id: i64, cookies: Option<String>) -> Result<EpisodeImagesResult, ApiError> {
+    if ep_id <= 0 {
+        return Err(ApiError::Validation("episode id must be positive".to_string()));
+    }
+
+    let client = reqwest::Client::new();
+    let mut request = client
+        .post(IMAGE_INDEX_ENDPOINT)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .header("x-bili-manga-from", "c-int-v1")
+        .header(reqwest::header::ORIGIN, OFFICIAL_ORIGIN)
+        .header(reqwest::header::REFERER, format!("{OFFICIAL_ORIGIN}/"))
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .json(&ImageIndexRequest { ep_id });
+    if let Some(cookie) = cookies.as_deref().filter(|value| !value.trim().is_empty()) {
+        request = request.header(reqwest::header::COOKIE, cookie);
+    }
+
+    let response = request
+        .send()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(ApiError::Status(status.as_u16()));
+    }
+    let envelope = response
+        .json::<TwirpEnvelope<serde_json::Value>>()
+        .await
+        .map_err(|error| ApiError::Schema(error.to_string()))?;
+    if envelope.code != 0 {
+        return Err(ApiError::Server { code: envelope.code, message: envelope_message(&envelope) });
+    }
+
+    let image_data = envelope
+        .data
+        .ok_or_else(|| ApiError::Schema("image index response did not include data".to_string()))?;
+    let paths = extract_image_paths(&image_data);
+    if paths.is_empty() {
+        return Err(ApiError::Schema("image index response did not include image paths".to_string()));
+    }
+
+    let token_body = ImageTokenRequest { urls: serde_json::to_string(&paths).map_err(|error| ApiError::Schema(error.to_string()))? };
+    let mut token_request = client
+        .post(IMAGE_TOKEN_ENDPOINT)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .header("x-bili-manga-from", "c-int-v1")
+        .header(reqwest::header::ORIGIN, OFFICIAL_ORIGIN)
+        .header(reqwest::header::REFERER, format!("{OFFICIAL_ORIGIN}/"))
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .json(&token_body);
+    if let Some(cookie) = cookies.as_deref().filter(|value| !value.trim().is_empty()) {
+        token_request = token_request.header(reqwest::header::COOKIE, cookie);
+    }
+
+    let token_response = token_request
+        .send()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+    let token_status = token_response.status();
+    if !token_status.is_success() {
+        return Err(ApiError::Status(token_status.as_u16()));
+    }
+    let token_envelope = token_response
+        .json::<TwirpEnvelope<serde_json::Value>>()
+        .await
+        .map_err(|error| ApiError::Schema(error.to_string()))?;
+    if token_envelope.code != 0 {
+        return Err(ApiError::Server { code: token_envelope.code, message: envelope_message(&token_envelope) });
+    }
+
+    let token_data = token_envelope
+        .data
+        .ok_or_else(|| ApiError::Schema("image token response did not include data".to_string()))?;
+    let images = extract_tokenized_image_urls(&token_data);
+    if images.is_empty() {
+        return Err(ApiError::Schema("image token response did not include image URLs".to_string()));
+    }
+    Ok(EpisodeImagesResult { images })
+}
+
+fn extract_image_paths(value: &serde_json::Value) -> Vec<String> {
+    value
+        .get("images")
+        .and_then(|v| v.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get("path").and_then(|path| path.as_str()).map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn extract_tokenized_image_urls(value: &serde_json::Value) -> Vec<String> {
+    let Some(items) = value.as_array() else { return Vec::new(); };
+    items
+        .iter()
+        .filter_map(|item| {
+            let url = item.get("url").and_then(|v| v.as_str())?;
+            let token = item.get("token").and_then(|v| v.as_str()).unwrap_or("");
+            if token.is_empty() {
+                Some(url.to_string())
+            } else if url.contains('?') {
+                Some(format!("{url}&token={token}"))
+            } else {
+                Some(format!("{url}?token={token}"))
+            }
+        })
+        .collect()
+}
+
+fn string_value(value: &serde_json::Value, key: &str) -> Option<String> {
+    value.get(key).and_then(|v| v.as_str()).map(str::to_string)
+}
+
+fn number_value(value: &serde_json::Value, key: &str) -> Option<f64> {
+    value.get(key).and_then(|v| v.as_f64().or_else(|| v.as_i64().map(|n| n as f64)))
+}
+
+fn bool_value(value: &serde_json::Value, key: &str) -> bool {
+    value.get(key).and_then(|v| v.as_bool()).unwrap_or(false)
+}
+
 pub async fn generate_qrcode() -> Result<QrCodeResult, ApiError> {
     let client = reqwest::Client::new();
     let response = client
@@ -852,6 +1105,35 @@ fn parse_set_cookie_header(header: &str) -> Option<Cookie> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_mobile_detail_page_data() {
+        let html = r#"<script id="vike_pageContext" type="application/json">{"data":{"seasonData":{"id":33354,"title":"黑化男主顺毛指南","vertical_cover":"v.png","horizontal_cover":"h.png","author_name":["甜漫文化"],"styles":["西幻"],"evaluate":"简介","is_finish":0,"total":1,"ep_list":[{"id":1127034,"ord":1,"short_title":"001","title":"人设预告","cover":"c.png","is_locked":false,"is_in_free":false,"image_count":12,"pub_time":"2024-01-01"}]}}}</script>"#;
+
+        let detail = parse_mobile_detail_page(html).expect("detail should parse");
+
+        assert_eq!(detail.id, 33354);
+        assert_eq!(detail.title, "黑化男主顺毛指南");
+        assert_eq!(detail.episodes.len(), 1);
+        assert_eq!(detail.episodes[0].id, 1127034);
+        assert!(!detail.episodes[0].is_locked);
+    }
+
+    #[test]
+    fn extracts_image_token_urls() {
+        let data = serde_json::json!([
+            {"url":"https://i0.hdslb.com/a.jpg", "token":"abc"},
+            {"url":"https://i0.hdslb.com/b.jpg?x=1", "token":"def"}
+        ]);
+
+        assert_eq!(
+            extract_tokenized_image_urls(&data),
+            vec![
+                "https://i0.hdslb.com/a.jpg?token=abc".to_string(),
+                "https://i0.hdslb.com/b.jpg?x=1&token=def".to_string()
+            ]
+        );
+    }
 
     #[test]
     fn builds_classify_page_url_for_style() {
