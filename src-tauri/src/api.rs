@@ -60,7 +60,6 @@ pub struct SearchSuggestionRequest {
     num: u8,
 }
 
-// Login types - structure ready, needs real account verification
 #[derive(Debug, Clone, Serialize)]
 pub struct QrCodeResult {
     pub url: String,
@@ -68,7 +67,7 @@ pub struct QrCodeResult {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum LoginStatus {
     Scanning,
     Confirmed,
@@ -159,6 +158,25 @@ struct LoginCheckData {
     is_login: bool,
     #[serde(default)]
     mid: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PassportEnvelope<T> {
+    code: i64,
+    message: String,
+    data: Option<T>,
+}
+
+#[derive(Debug, Deserialize)]
+struct QrCodeData {
+    url: String,
+    qrcode_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct QrPollData {
+    code: i64,
+    message: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -466,12 +484,13 @@ async fn fetch_homepage_ssr_data() -> Result<ClassPageResult, ApiError> {
 }
 
 fn parse_homepage_comics(html: &str) -> Result<ClassPageResult, ApiError> {
-    // Look for window.__INITIAL_STATE__ or embedded JSON in script tags
-    // Pattern 1: window.__INITIAL_STATE__ = {...}
+    if let Some(script_json) = extract_script_json(html, "vike_pageContext") {
+        return parse_initial_state_json(&script_json);
+    }
+
     if let Some(start) = html.find("window.__INITIAL_STATE__") {
         if let Some(json_start) = html[start..].find('{') {
             let json_start_pos = start + json_start;
-            // Find matching closing brace
             if let Some(json_end) = find_json_end(&html[json_start_pos..]) {
                 let json_str = &html[json_start_pos..json_start_pos + json_end];
                 return parse_initial_state_json(json_str);
@@ -479,11 +498,16 @@ fn parse_homepage_comics(html: &str) -> Result<ClassPageResult, ApiError> {
         }
     }
 
-    // Pattern 2: Look for any script tag with comic data
-    // This is a fallback - we'll refine based on actual HTML structure
     Err(ApiError::Schema(
-        "Could not find SSR data in homepage HTML".to_string(),
+        "Could not find homepage manga data in official HTML".to_string(),
     ))
+}
+
+fn extract_script_json(html: &str, script_id: &str) -> Option<String> {
+    let marker = format!(r#"<script id="{script_id}" type="application/json">"#);
+    let start = html.find(&marker)? + marker.len();
+    let end = html[start..].find("</script>")?;
+    Some(html[start..start + end].to_string())
 }
 
 fn find_json_end(json_str: &str) -> Option<usize> {
@@ -529,85 +553,73 @@ fn parse_initial_state_json(json_str: &str) -> Result<ClassPageResult, ApiError>
 }
 
 fn extract_comics_from_json(value: &serde_json::Value) -> Result<Vec<ClassPageComic>, ApiError> {
-    // Common paths where SSR data might store comics:
-    // - data.list
-    // - recommendList
-    // - homeData.list
-    // etc.
-
     let mut comics = Vec::new();
-
-    // Try multiple possible paths
-    if let Some(list) = value.get("data").and_then(|d| d.get("list")) {
-        if let Some(arr) = list.as_array() {
-            for item in arr {
-                if let Ok(comic) = parse_comic_from_json(item) {
-                    comics.push(comic);
-                }
-            }
-        }
-    }
-
-    if comics.is_empty() {
-        // Try other paths...
-        if let Some(list) = value.get("recommendList") {
-            if let Some(arr) = list.as_array() {
-                for item in arr {
-                    if let Ok(comic) = parse_comic_from_json(item) {
-                        comics.push(comic);
-                    }
-                }
-            }
-        }
-    }
+    let mut seen_ids = std::collections::HashSet::new();
+    collect_comics_from_json(value, &mut comics, &mut seen_ids);
 
     if comics.is_empty() {
         return Err(ApiError::Schema(
-            "No comics found in SSR JSON data".to_string(),
+            "No comics found in homepage JSON data".to_string(),
         ));
     }
 
     Ok(comics)
 }
 
+fn collect_comics_from_json(
+    value: &serde_json::Value,
+    comics: &mut Vec<ClassPageComic>,
+    seen_ids: &mut std::collections::HashSet<i64>,
+) {
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_comics_from_json(item, comics, seen_ids);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            if let Some(comic_value) = map.get("comic") {
+                collect_comics_from_json(comic_value, comics, seen_ids);
+            }
+
+            if let Ok(comic) = parse_comic_from_json(value) {
+                if seen_ids.insert(comic.id) {
+                    comics.push(comic);
+                }
+            }
+
+            for child in map.values() {
+                collect_comics_from_json(child, comics, seen_ids);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn parse_comic_from_json(item: &serde_json::Value) -> Result<ClassPageComic, ApiError> {
+    let id = item
+        .get("comic_id")
+        .or_else(|| item.get("id"))
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| ApiError::Schema("Missing comic id".to_string()))?;
+    let title = item
+        .get("title")
+        .and_then(|v| v.as_str())
+        .filter(|title| !title.trim().is_empty())
+        .ok_or_else(|| ApiError::Schema("Missing comic title".to_string()))?
+        .to_string();
+
     Ok(ClassPageComic {
-        id: item
-            .get("comic_id")
-            .or_else(|| item.get("id"))
-            .and_then(|v| v.as_i64())
-            .ok_or_else(|| ApiError::Schema("Missing comic id".to_string()))?,
-        title: item
-            .get("title")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
+        id,
+        title,
         vertical_cover: item
             .get("vertical_cover")
             .or_else(|| item.get("vcover"))
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),
-        author_name: item
-            .get("author_name")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|s| s.as_str())
-                    .map(|s| s.to_string())
-                    .collect()
-            })
-            .unwrap_or_default(),
-        styles: item
-            .get("styles")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|s| s.as_str())
-                    .map(|s| s.to_string())
-                    .collect()
-            })
-            .unwrap_or_default(),
+        author_name: string_array_from_json(item.get("author_name").or_else(|| item.get("author"))),
+        styles: string_array_from_json(item.get("styles").or_else(|| item.get("tags"))),
         is_finish: item
             .get("is_finish")
             .and_then(|v| v.as_i64())
@@ -624,29 +636,165 @@ fn parse_comic_from_json(item: &serde_json::Value) -> Result<ClassPageComic, Api
     })
 }
 
-// Login API - to be verified with real account
-pub async fn generate_qrcode() -> Result<QrCodeResult, ApiError> {
-    // Placeholder implementation - requires passport API verification
-    // TODO: Implement QR code generation endpoint
-    // TODO: Verify response structure
-    Err(ApiError::NotImplemented(
-        "QR login requires passport API verification - use official login page https://passport.bilibili.com/login".to_string(),
-    ))
+fn string_array_from_json(value: Option<&serde_json::Value>) -> Vec<String> {
+    value
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|item| {
+                    item.as_str()
+                        .or_else(|| item.get("name").and_then(|name| name.as_str()))
+                        .map(|text| text.to_string())
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
-pub async fn poll_login_status(_qrcode_key: &str) -> Result<LoginStatus, ApiError> {
-    // Placeholder implementation - requires passport API verification
-    // TODO: Implement polling endpoint
-    // TODO: Handle all login states (scanning/confirmed/success/expired/failed)
-    // TODO: Extract cookies from success response
-    Err(ApiError::NotImplemented(
-        "login polling requires passport API verification - use official login page https://passport.bilibili.com/login".to_string(),
-    ))
+pub async fn generate_qrcode() -> Result<QrCodeResult, ApiError> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get("https://passport.bilibili.com/x/passport-login/web/qrcode/generate")
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .send()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(ApiError::Status(status.as_u16()));
+    }
+
+    let envelope = response
+        .json::<PassportEnvelope<QrCodeData>>()
+        .await
+        .map_err(|error| ApiError::Schema(error.to_string()))?;
+
+    if envelope.code != 0 {
+        return Err(ApiError::Server {
+            code: envelope.code,
+            message: envelope.message,
+        });
+    }
+
+    let data = envelope.data.ok_or_else(|| {
+        ApiError::Schema("QR login response must include data".to_string())
+    })?;
+
+    Ok(QrCodeResult {
+        url: data.url,
+        qrcode_key: data.qrcode_key,
+    })
+}
+
+pub async fn poll_login_status(qrcode_key: &str) -> Result<LoginStatus, ApiError> {
+    if qrcode_key.trim().is_empty() {
+        return Err(ApiError::Validation("qrcode key cannot be empty".to_string()));
+    }
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get("https://passport.bilibili.com/x/passport-login/web/qrcode/poll")
+        .query(&[("qrcode_key", qrcode_key)])
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .send()
+        .await
+        .map_err(|error| ApiError::Transport(error.to_string()))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(ApiError::Status(status.as_u16()));
+    }
+
+    let cookies = cookies_from_response_headers(response.headers());
+    let envelope = response
+        .json::<PassportEnvelope<QrPollData>>()
+        .await
+        .map_err(|error| ApiError::Schema(error.to_string()))?;
+
+    if envelope.code != 0 {
+        return Err(ApiError::Server {
+            code: envelope.code,
+            message: envelope.message,
+        });
+    }
+
+    let data = envelope.data.ok_or_else(|| {
+        ApiError::Schema("QR login poll response must include data".to_string())
+    })?;
+
+    match data.code {
+        0 => Ok(LoginStatus::Success { cookies }),
+        86090 => Ok(LoginStatus::Confirmed),
+        86101 => Ok(LoginStatus::Scanning),
+        86038 => Ok(LoginStatus::Expired),
+        _ => {
+            if data.message.contains("扫码") {
+                Ok(LoginStatus::Scanning)
+            } else {
+                Ok(LoginStatus::Failed)
+            }
+        }
+    }
+}
+
+fn cookies_from_response_headers(headers: &reqwest::header::HeaderMap) -> Vec<Cookie> {
+    headers
+        .get_all(reqwest::header::SET_COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .filter_map(parse_set_cookie_header)
+        .collect()
+}
+
+fn parse_set_cookie_header(header: &str) -> Option<Cookie> {
+    let mut parts = header.split(';').map(str::trim);
+    let name_value = parts.next()?;
+    let (name, value) = name_value.split_once('=')?;
+    if name.is_empty() {
+        return None;
+    }
+
+    let mut domain = ".bilibili.com".to_string();
+    for part in parts {
+        if let Some(value) = part.strip_prefix("Domain=").or_else(|| part.strip_prefix("domain=")) {
+            domain = value.to_string();
+        }
+    }
+
+    Some(Cookie {
+        name: name.to_string(),
+        value: value.to_string(),
+        domain,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_set_cookie_header_with_domain() {
+        let cookie = parse_set_cookie_header("SESSDATA=abc123; Path=/; Domain=.bilibili.com; HttpOnly")
+            .expect("set-cookie should parse");
+
+        assert_eq!(cookie.name, "SESSDATA");
+        assert_eq!(cookie.value, "abc123");
+        assert_eq!(cookie.domain, ".bilibili.com");
+    }
+
+    #[test]
+    fn parses_current_vike_page_context_homepage_data() {
+        let html = r#"<html><body><script id="vike_pageContext" type="application/json">{"data":{"banner":[{"list":[{"comic":{"comic_id":28241,"title":"从1级开始的异世界骑士","vertical_cover":"https://example.invalid/cover.png","author":["作者A"],"styles":[{"id":999,"name":"热血"}],"is_finish":0,"last_ord":12,"last_short_title":"12"}}]}]}}</script></body></html>"#;
+
+        let result = parse_homepage_comics(html).expect("current homepage JSON should parse");
+
+        assert_eq!(result.total, 1);
+        assert_eq!(result.comics[0].id, 28241);
+        assert_eq!(result.comics[0].title, "从1级开始的异世界骑士");
+        assert_eq!(result.comics[0].author_name, vec!["作者A"]);
+        assert_eq!(result.comics[0].styles, vec!["热血"]);
+    }
 
     #[test]
     fn builds_trimmed_search_suggestion_request_with_limit() {
