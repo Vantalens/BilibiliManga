@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { listStoredReadingProgress, type StoredReadingProgress } from "../bridge/tauriBridge";
+import { useEffect, useMemo, useState } from "react";
+import { fetchComicDetail, listStoredReadingProgress, type ComicDetailResult, type StoredReadingProgress } from "../bridge/tauriBridge";
+import { buildReadingHistoryRows } from "../domain/history";
 import "../styles-manga.css";
 
 interface MangaHistoryPageProps {
@@ -11,62 +12,93 @@ function formatTime(value: number): string {
   return new Date(value).toLocaleString();
 }
 
+function numericComicIds(items: StoredReadingProgress[]): number[] {
+  const ids = new Set<number>();
+  for (const item of items) {
+    const id = Number(item.manga_id);
+    if (Number.isFinite(id) && id > 0) ids.add(id);
+  }
+  return Array.from(ids);
+}
+
 export function MangaHistoryPage({ onOpenComic }: MangaHistoryPageProps) {
   const [items, setItems] = useState<StoredReadingProgress[]>([]);
+  const [details, setDetails] = useState<Map<number, ComicDetailResult>>(() => new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     listStoredReadingProgress(80)
-      .then(setItems)
+      .then(async (progress) => {
+        if (cancelled) return;
+        setItems(progress);
+        const loadedDetails = new Map<number, ComicDetailResult>();
+        await Promise.all(
+          numericComicIds(progress).map(async (comicId) => {
+            try {
+              loadedDetails.set(comicId, await fetchComicDetail(comicId));
+            } catch (err) {
+              console.error("load history comic detail failed:", err);
+            }
+          })
+        );
+        if (!cancelled) setDetails(loadedDetails);
+      })
       .catch((err) => {
         console.error("load reading history failed:", err);
-        setItems([]);
-        setError("最近阅读暂时没有加载出来。");
+        if (!cancelled) {
+          setItems([]);
+          setDetails(new Map());
+          setError("最近阅读暂时没有加载出来。");
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const rows = useMemo(() => buildReadingHistoryRows(items, details), [details, items]);
 
   return (
     <section className="feed-page">
       <div className="section-header">
         <div>
           <h2>最近</h2>
-          <p>{items.length > 0 ? "最近阅读 " + items.length + " 条" : "阅读记录会保存在本机"}</p>
+          <p>{rows.length > 0 ? "最近阅读 " + rows.length + " 条" : "阅读记录会保存在本机"}</p>
         </div>
       </div>
 
       {error && <div className="notice notice--error">{error}</div>}
       {loading && <div className="notice">正在加载最近阅读</div>}
 
-      {!loading && items.length === 0 && (
+      {!loading && rows.length === 0 && (
         <div className="state-page state-page--inline">
           <h2>暂无阅读记录</h2>
           <p>打开可读章节后，进度会保存在这里。</p>
         </div>
       )}
 
-      {!loading && items.length > 0 && (
+      {!loading && rows.length > 0 && (
         <div className="history-list">
-          {items.map((item) => {
-            const comicId = Number(item.manga_id);
-            const canOpen = Number.isFinite(comicId) && comicId > 0;
-            return (
-              <button
-                className="history-item"
-                disabled={!canOpen}
-                key={item.id}
-                onClick={() => canOpen && onOpenComic(comicId)}
-                type="button"
-              >
-                <span>漫画 {item.manga_id}</span>
-                <strong>章节 {item.chapter_id}</strong>
-                <em>{item.mode === "page" ? "分页" : "长滚动"} · 第 {item.page_index + 1} 页 · {formatTime(item.updated_at)}</em>
-              </button>
-            );
-          })}
+          {rows.map((item) => (
+            <button
+              className="history-item"
+              disabled={!item.canOpen}
+              key={item.id}
+              onClick={() => item.canOpen && onOpenComic(item.comicId)}
+              type="button"
+            >
+              <span>{item.comicTitle}</span>
+              <strong>{item.episodeTitle}</strong>
+              <em>{item.mode === "page" ? "分页" : "长滚动"} · 第 {item.pageIndex + 1} 页 · {formatTime(item.updatedAt)}</em>
+            </button>
+          ))}
         </div>
       )}
     </section>
