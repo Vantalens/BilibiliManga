@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampProgress, getNextPageIndex, getPreviousPageIndex } from "./reader";
+import { applyReaderAction, clampProgress, getNextPageIndex, getPreviousPageIndex, type ReaderViewState } from "./reader";
 
 describe("reader progress helpers", () => {
   it("clamps progress into the available page range", () => {
@@ -16,3 +16,27 @@ describe("reader progress helpers", () => {
   });
 });
 
+
+describe("reader view state", () => {
+  const baseState: ReaderViewState = {
+    mode: "scroll",
+    immersive: false,
+    pageIndex: 1,
+    totalPages: 4,
+  };
+
+  it("switches between scroll and page modes without losing valid page progress", () => {
+    expect(applyReaderAction(baseState, { type: "set_mode", mode: "page" })).toEqual({
+      ...baseState,
+      mode: "page",
+    });
+    expect(applyReaderAction({ ...baseState, pageIndex: 10 }, { type: "set_mode", mode: "page" }).pageIndex).toBe(3);
+  });
+
+  it("handles keyboard navigation and immersive toggles", () => {
+    expect(applyReaderAction(baseState, { type: "next_page" }).pageIndex).toBe(2);
+    expect(applyReaderAction(baseState, { type: "previous_page" }).pageIndex).toBe(0);
+    expect(applyReaderAction(baseState, { type: "toggle_immersive" }).immersive).toBe(true);
+    expect(applyReaderAction({ ...baseState, immersive: true }, { type: "exit_immersive" }).immersive).toBe(false);
+  });
+});

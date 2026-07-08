@@ -88,3 +88,4 @@
 - 已将登录态搜索接入官方 `Search`，失败时回退公开分类索引，搜索不再跳转官网。
 - 已将书架页主路径改为 `bookshelf.v1.Bookshelf/ListFavorite`，并保留本机书架兜底；书架卡片进入应用内详情。
 - 已新增本机“最近”页：从 SQLCipher `reading_progress` 列表读取最近阅读并可回到应用内漫画详情。
+- 已补齐阅读器基础交互：长滚动/分页切换、上一页/下一页、隐藏 UI、Esc 退出沉浸、方向键/PageUp/PageDown/F/P/S 快捷键、阅读偏好和页码进度持久化。
