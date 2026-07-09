@@ -1,0 +1,166 @@
+import { useState } from "react";
+import {
+  checkLoginStatus,
+  fetchComicDetail,
+  fetchEpisodeImages,
+  fetchUserBookshelf,
+  getStoredCookies,
+  hasStoredCookies,
+  searchComics,
+  type BookshelfItem,
+  type ClassPageComic,
+  type ComicDetailResult,
+} from "../bridge/tauriBridge";
+import { chooseDiagnosticComicId, chooseReadableDiagnosticEpisode } from "../domain/apiDiagnostics";
+import { formatApiFailure } from "../domain/apiErrors";
+
+type DiagnosticStatus = "idle" | "running" | "passed" | "failed" | "skipped";
+type DiagnosticStepId = "login" | "bookshelf" | "search" | "detail" | "images";
+
+interface DiagnosticStep {
+  id: DiagnosticStepId;
+  label: string;
+  status: DiagnosticStatus;
+  detail: string;
+}
+
+const stepLabels: Record<DiagnosticStepId, string> = {
+  login: "登录状态",
+  bookshelf: "书架同步",
+  search: "应用内搜索",
+  detail: "漫画详情",
+  images: "章节图片",
+};
+
+function createInitialSteps(): DiagnosticStep[] {
+  return (Object.keys(stepLabels) as DiagnosticStepId[]).map((id) => ({
+    id,
+    label: stepLabels[id],
+    status: "idle",
+    detail: "等待检查",
+  }));
+}
+
+function statusText(status: DiagnosticStatus): string {
+  if (status === "running") return "检查中";
+  if (status === "passed") return "通过";
+  if (status === "failed") return "失败";
+  if (status === "skipped") return "跳过";
+  return "待检查";
+}
+
+function statusClass(status: DiagnosticStatus): string {
+  return "diagnostic-status diagnostic-status--" + status;
+}
+
+export function ApiDiagnosticsPanel() {
+  const [steps, setSteps] = useState<DiagnosticStep[]>(createInitialSteps);
+  const [running, setRunning] = useState(false);
+
+  const updateStep = (id: DiagnosticStepId, status: DiagnosticStatus, detail: string) => {
+    setSteps((current) => current.map((step) => (step.id === id ? { ...step, status, detail } : step)));
+  };
+
+  const runDiagnostics = async () => {
+    setRunning(true);
+    setSteps(createInitialSteps());
+
+    let cookies: string | undefined;
+    let bookshelfItems: BookshelfItem[] = [];
+    let searchResults: ClassPageComic[] = [];
+    let detail: ComicDetailResult | null = null;
+
+    updateStep("login", "running", "正在检查本机登录状态");
+    try {
+      const hasCookies = await hasStoredCookies();
+      if (!hasCookies) {
+        throw new Error("No stored cookies found");
+      }
+      const stored = await getStoredCookies();
+      const status = await checkLoginStatus(stored.raw_cookie);
+      if (!status.is_login) {
+        throw new Error("need login");
+      }
+      cookies = stored.raw_cookie;
+      updateStep("login", "passed", "登录状态可用");
+    } catch (err) {
+      updateStep("login", "failed", formatApiFailure(err));
+    }
+
+    if (cookies) {
+      updateStep("bookshelf", "running", "正在同步哔哩哔哩漫画书架");
+      try {
+        const result = await fetchUserBookshelf(1, 5, cookies);
+        bookshelfItems = result.items;
+        updateStep("bookshelf", "passed", "已返回 " + result.items.length + " 部书架漫画");
+      } catch (err) {
+        updateStep("bookshelf", "failed", formatApiFailure(err));
+      }
+    } else {
+      updateStep("bookshelf", "skipped", "需要登录后检查官网书架");
+    }
+
+    updateStep("search", "running", "正在检查应用内搜索");
+    try {
+      const result = await searchComics("有兽焉", 10, cookies);
+      searchResults = result.comics;
+      updateStep("search", "passed", "已返回 " + result.comics.length + " 条搜索结果");
+    } catch (err) {
+      updateStep("search", "failed", formatApiFailure(err));
+    }
+
+    const diagnosticComicId = chooseDiagnosticComicId(bookshelfItems, searchResults);
+    updateStep("detail", "running", "正在加载漫画详情");
+    try {
+      detail = await fetchComicDetail(diagnosticComicId);
+      updateStep("detail", "passed", detail.title + "，共 " + detail.episodes.length + " 话");
+    } catch (err) {
+      updateStep("detail", "failed", formatApiFailure(err));
+    }
+
+    if (detail) {
+      const episode = chooseReadableDiagnosticEpisode(detail);
+      if (!episode) {
+        updateStep("images", "skipped", "没有可用于诊断的免费或已解锁章节");
+      } else {
+        updateStep("images", "running", "正在检查章节图片加载");
+        try {
+          const result = await fetchEpisodeImages(detail.id, episode.id, cookies);
+          updateStep("images", "passed", "已返回 " + result.images.length + " 张图片");
+        } catch (err) {
+          updateStep("images", "failed", formatApiFailure(err));
+        }
+      }
+    } else {
+      updateStep("images", "skipped", "详情加载失败，无法继续检查章节图片");
+    }
+
+    setRunning(false);
+  };
+
+  return (
+    <section className="diagnostics-panel" aria-label="接口诊断">
+      <div className="diagnostics-header">
+        <div>
+          <h3>阅读诊断</h3>
+          <p>检查登录、书架、搜索、详情和章节图片是否可用。</p>
+        </div>
+        <button className="check-button" type="button" onClick={() => void runDiagnostics()} disabled={running}>
+          {running ? "检查中" : "开始检查"}
+        </button>
+      </div>
+
+      <div className="diagnostic-steps">
+        {steps.map((step) => (
+          <div className="diagnostic-row" key={step.id}>
+            <div>
+              <strong>{step.label}</strong>
+              <p>{step.detail}</p>
+            </div>
+            <span className={statusClass(step.status)}>{statusText(step.status)}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

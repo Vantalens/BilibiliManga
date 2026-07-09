@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import QRCode from "qrcode";
+import { ApiDiagnosticsPanel } from "./ApiDiagnosticsPanel";
 import {
   checkLoginStatus,
   deleteStoredCookies,
@@ -180,6 +181,8 @@ export function LoginPage() {
           </div>
         )}
 
+        <ApiDiagnosticsPanel />
+
         <div className="login-notice">
           <p>• 本软件不会接管支付、购买或账号安全操作</p>
           <p>• 未解锁章节会回到官网处理</p>
@@ -320,6 +323,94 @@ export function LoginPage() {
           background: #f5f7fa;
           color: #62666d;
         }
+        .diagnostics-panel {
+          margin-top: 22px;
+          border-top: 1px solid #e5e7eb;
+          padding-top: 18px;
+        }
+
+        .diagnostics-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 14px;
+          margin-bottom: 12px;
+        }
+
+        .diagnostics-header h3 {
+          margin: 0 0 4px;
+          color: #18191c;
+          font-size: 16px;
+        }
+
+        .diagnostics-header p {
+          margin: 0;
+          color: #7d838c;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .diagnostic-steps {
+          display: grid;
+          gap: 8px;
+        }
+
+        .diagnostic-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 10px 12px;
+          border: 1px solid #edf0f3;
+          border-radius: 8px;
+          background: #fff;
+        }
+
+        .diagnostic-row strong {
+          display: block;
+          color: #18191c;
+          font-size: 13px;
+          margin-bottom: 3px;
+        }
+
+        .diagnostic-row p {
+          margin: 0;
+          color: #7d838c;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+
+        .diagnostic-status {
+          flex: 0 0 auto;
+          min-width: 58px;
+          text-align: center;
+          padding: 5px 8px;
+          border-radius: 999px;
+          font-size: 12px;
+          color: #62666d;
+          background: #f5f7fa;
+        }
+
+        .diagnostic-status--running {
+          color: #0077a8;
+          background: #eaf8ff;
+        }
+
+        .diagnostic-status--passed {
+          color: #0b8f5a;
+          background: #eaf8f1;
+        }
+
+        .diagnostic-status--failed {
+          color: #c24d73;
+          background: #fff3f6;
+        }
+
+        .diagnostic-status--skipped {
+          color: #8a6d2f;
+          background: #fff7dc;
+        }
+
 
         .login-notice {
           margin-top: 24px;
