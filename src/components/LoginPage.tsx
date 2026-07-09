@@ -411,6 +411,48 @@ export function LoginPage() {
           background: #fff7dc;
         }
 
+        .diagnostic-report {
+          margin-top: 12px;
+          padding: 12px;
+          border: 1px solid #edf0f3;
+          border-radius: 8px;
+          background: #fafbfc;
+        }
+
+        .diagnostic-report__header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 10px;
+        }
+
+        .diagnostic-report__header strong {
+          color: #18191c;
+          font-size: 13px;
+        }
+
+        .diagnostic-report textarea {
+          width: 100%;
+          min-height: 138px;
+          box-sizing: border-box;
+          resize: vertical;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 10px;
+          color: #33363d;
+          background: #fff;
+          font-size: 12px;
+          line-height: 1.5;
+          font-family: Consolas, "Microsoft YaHei", monospace;
+        }
+
+        .diagnostic-report p {
+          margin: 8px 0 0;
+          color: #7d838c;
+          font-size: 12px;
+        }
+
 
         .login-notice {
           margin-top: 24px;

@@ -4,15 +4,18 @@ import {
   fetchComicDetail,
   fetchEpisodeImages,
   fetchUserBookshelf,
+  getAppStatus,
   getStoredCookies,
   hasStoredCookies,
   searchComics,
+  type AppStatus,
   type BookshelfItem,
   type ClassPageComic,
   type ComicDetailResult,
 } from "../bridge/tauriBridge";
 import { chooseDiagnosticComicId, chooseReadableDiagnosticEpisode } from "../domain/apiDiagnostics";
 import { formatApiFailure } from "../domain/apiErrors";
+import { buildDiagnosticReport } from "../domain/diagnosticReport";
 
 type DiagnosticStatus = "idle" | "running" | "passed" | "failed" | "skipped";
 type DiagnosticStepId = "login" | "bookshelf" | "search" | "detail" | "images";
@@ -53,24 +56,63 @@ function statusClass(status: DiagnosticStatus): string {
   return "diagnostic-status diagnostic-status--" + status;
 }
 
+function defaultAppStatus(): AppStatus {
+  return {
+    app_name: "BiliManga",
+    version: "0.1.0",
+    platform: "unknown",
+    content_policy: {
+      payment_flow: "official_web",
+      cache_policy: "short_term_only",
+      export_allowed: false,
+    },
+  };
+}
+
 export function ApiDiagnosticsPanel() {
   const [steps, setSteps] = useState<DiagnosticStep[]>(createInitialSteps);
   const [running, setRunning] = useState(false);
+  const [report, setReport] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
 
   const updateStep = (id: DiagnosticStepId, status: DiagnosticStatus, detail: string) => {
     setSteps((current) => current.map((step) => (step.id === id ? { ...step, status, detail } : step)));
   };
 
+  const buildReportFromSteps = async (currentSteps: DiagnosticStep[]) => {
+    let appStatus = defaultAppStatus();
+    try {
+      appStatus = await getAppStatus();
+    } catch {
+      // The report still remains useful if app metadata cannot be loaded.
+    }
+    return buildDiagnosticReport({
+      generatedAt: new Date(),
+      appName: appStatus.app_name,
+      appVersion: appStatus.version,
+      platform: appStatus.platform,
+      steps: currentSteps,
+    });
+  };
+
   const runDiagnostics = async () => {
     setRunning(true);
-    setSteps(createInitialSteps());
+    setCopyStatus("");
+    setReport("");
+    let currentSteps = createInitialSteps();
+    setSteps(currentSteps);
+
+    const recordStep = (id: DiagnosticStepId, status: DiagnosticStatus, detail: string) => {
+      currentSteps = currentSteps.map((step) => (step.id === id ? { ...step, status, detail } : step));
+      setSteps(currentSteps);
+    };
 
     let cookies: string | undefined;
     let bookshelfItems: BookshelfItem[] = [];
     let searchResults: ClassPageComic[] = [];
     let detail: ComicDetailResult | null = null;
 
-    updateStep("login", "running", "正在检查本机登录状态");
+    recordStep("login", "running", "正在检查本机登录状态");
     try {
       const hasCookies = await hasStoredCookies();
       if (!hasCookies) {
@@ -82,60 +124,71 @@ export function ApiDiagnosticsPanel() {
         throw new Error("need login");
       }
       cookies = stored.raw_cookie;
-      updateStep("login", "passed", "登录状态可用");
+      recordStep("login", "passed", "登录状态可用");
     } catch (err) {
-      updateStep("login", "failed", formatApiFailure(err));
+      recordStep("login", "failed", formatApiFailure(err));
     }
 
     if (cookies) {
-      updateStep("bookshelf", "running", "正在同步哔哩哔哩漫画书架");
+      recordStep("bookshelf", "running", "正在同步哔哩哔哩漫画书架");
       try {
         const result = await fetchUserBookshelf(1, 5, cookies);
         bookshelfItems = result.items;
-        updateStep("bookshelf", "passed", "已返回 " + result.items.length + " 部书架漫画");
+        recordStep("bookshelf", "passed", "已返回 " + result.items.length + " 部书架漫画");
       } catch (err) {
-        updateStep("bookshelf", "failed", formatApiFailure(err));
+        recordStep("bookshelf", "failed", formatApiFailure(err));
       }
     } else {
-      updateStep("bookshelf", "skipped", "需要登录后检查官网书架");
+      recordStep("bookshelf", "skipped", "需要登录后检查官网书架");
     }
 
-    updateStep("search", "running", "正在检查应用内搜索");
+    recordStep("search", "running", "正在检查应用内搜索");
     try {
       const result = await searchComics("有兽焉", 10, cookies);
       searchResults = result.comics;
-      updateStep("search", "passed", "已返回 " + result.comics.length + " 条搜索结果");
+      recordStep("search", "passed", "已返回 " + result.comics.length + " 条搜索结果");
     } catch (err) {
-      updateStep("search", "failed", formatApiFailure(err));
+      recordStep("search", "failed", formatApiFailure(err));
     }
 
     const diagnosticComicId = chooseDiagnosticComicId(bookshelfItems, searchResults);
-    updateStep("detail", "running", "正在加载漫画详情");
+    recordStep("detail", "running", "正在加载漫画详情");
     try {
       detail = await fetchComicDetail(diagnosticComicId);
-      updateStep("detail", "passed", detail.title + "，共 " + detail.episodes.length + " 话");
+      recordStep("detail", "passed", detail.title + "，共 " + detail.episodes.length + " 话");
     } catch (err) {
-      updateStep("detail", "failed", formatApiFailure(err));
+      recordStep("detail", "failed", formatApiFailure(err));
     }
 
     if (detail) {
       const episode = chooseReadableDiagnosticEpisode(detail);
       if (!episode) {
-        updateStep("images", "skipped", "没有可用于诊断的免费或已解锁章节");
+        recordStep("images", "skipped", "没有可用于诊断的免费或已解锁章节");
       } else {
-        updateStep("images", "running", "正在检查章节图片加载");
+        recordStep("images", "running", "正在检查章节图片加载");
         try {
           const result = await fetchEpisodeImages(detail.id, episode.id, cookies);
-          updateStep("images", "passed", "已返回 " + result.images.length + " 张图片");
+          recordStep("images", "passed", "已返回 " + result.images.length + " 张图片");
         } catch (err) {
-          updateStep("images", "failed", formatApiFailure(err));
+          recordStep("images", "failed", formatApiFailure(err));
         }
       }
     } else {
-      updateStep("images", "skipped", "详情加载失败，无法继续检查章节图片");
+      recordStep("images", "skipped", "详情加载失败，无法继续检查章节图片");
     }
 
+    setReport(await buildReportFromSteps(currentSteps));
     setRunning(false);
+  };
+
+  const copyReport = async () => {
+    if (!report) return;
+    try {
+      await navigator.clipboard.writeText(report);
+      setCopyStatus("已复制");
+    } catch {
+      setCopyStatus("无法自动复制，可手动选中文本");
+    }
   };
 
   return (
@@ -161,6 +214,19 @@ export function ApiDiagnosticsPanel() {
           </div>
         ))}
       </div>
+
+      {report && (
+        <div className="diagnostic-report">
+          <div className="diagnostic-report__header">
+            <strong>诊断报告</strong>
+            <button className="check-button" type="button" onClick={() => void copyReport()}>
+              复制报告
+            </button>
+          </div>
+          <textarea readOnly value={report} aria-label="诊断报告" />
+          {copyStatus && <p>{copyStatus}</p>}
+        </div>
+      )}
     </section>
   );
 }
