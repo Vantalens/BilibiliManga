@@ -8,6 +8,7 @@ import {
   type BookshelfItem,
   type StoredLibraryItem,
 } from "../bridge/tauriBridge";
+import { formatApiFailure } from "../domain/apiErrors";
 import "../styles-manga.css";
 
 interface MangaPurchasedPageProps {
@@ -101,7 +102,7 @@ export function MangaPurchasedPage({ onOpenComic }: MangaPurchasedPageProps) {
       setHasMore(result.has_more);
     } catch (err) {
       console.error("load bookshelf failed:", err);
-      setNotice("官网书架暂时没有同步，本机书架仍可使用。登录过期时请重新扫码登录。");
+      setNotice(formatApiFailure(err));
       setHasMore(false);
     } finally {
       setLoading(false);

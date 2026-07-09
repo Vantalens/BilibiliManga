@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchComicDetail, proxyImageToDataUrl, type ComicDetailResult, type ComicEpisode } from "../bridge/tauriBridge";
+import { formatApiFailure } from "../domain/apiErrors";
 
 interface MangaDetailPageProps {
   comicId: number;
@@ -43,7 +44,7 @@ export function MangaDetailPage({ comicId, onBack, onReadEpisode }: MangaDetailP
       .then(setDetail)
       .catch((err) => {
         console.error("fetch comic detail failed:", err);
-        setError("漫画详情暂时没有加载出来，请稍后重试。");
+        setError(formatApiFailure(err));
       })
       .finally(() => setLoading(false));
   }, [comicId]);

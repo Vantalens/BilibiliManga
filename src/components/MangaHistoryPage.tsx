@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchComicDetail, listStoredReadingProgress, type ComicDetailResult, type StoredReadingProgress } from "../bridge/tauriBridge";
+import { formatApiFailure } from "../domain/apiErrors";
 import { buildReadingHistoryRows } from "../domain/history";
 import "../styles-manga.css";
 
@@ -52,7 +53,7 @@ export function MangaHistoryPage({ onOpenComic }: MangaHistoryPageProps) {
         if (!cancelled) {
           setItems([]);
           setDetails(new Map());
-          setError("最近阅读暂时没有加载出来。");
+          setError(formatApiFailure(err));
         }
       })
       .finally(() => {

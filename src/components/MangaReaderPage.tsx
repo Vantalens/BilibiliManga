@@ -10,6 +10,7 @@ import {
   type ComicEpisode,
 } from "../bridge/tauriBridge";
 import { applyReaderAction, clampProgress, type ReaderMode, type ReaderViewState } from "../domain/reader";
+import { formatApiFailure } from "../domain/apiErrors";
 
 interface MangaReaderPageProps {
   detail: ComicDetailResult;
@@ -99,7 +100,7 @@ export function MangaReaderPage({ detail, episode, onBack }: MangaReaderPageProp
         console.error("fetch episode images failed:", err);
         setImages([]);
         setView((current) => ({ ...current, pageIndex: 0, totalPages: 0 }));
-        setError("章节图片接口暂时没有通过官方校验，无法在应用内阅读这一话。");
+        setError(formatApiFailure(err));
       })
       .finally(() => setLoading(false));
   }, [detail.id, episode.id, episode.is_in_free, episode.is_locked]);

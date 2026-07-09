@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getStoredCookies, proxyImageToDataUrl, searchComics, type ClassPageComic } from "../bridge/tauriBridge";
+import { formatApiFailure } from "../domain/apiErrors";
 
 interface SearchResultsPageProps {
   keyword: string;
@@ -67,7 +68,7 @@ export function SearchResultsPage({ keyword, onOpenComic }: SearchResultsPagePro
       .catch((err) => {
         console.error("search comics failed:", err);
         setComics([]);
-        setError("搜索暂时没有加载出来，请稍后重试。");
+        setError(formatApiFailure(err));
       })
       .finally(() => setLoading(false));
   }, [keyword]);
