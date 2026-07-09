@@ -47,6 +47,23 @@ function progressId(detailId: number, episodeId: number): string {
   return "manga:" + detailId + ":episode:" + episodeId;
 }
 
+function isMissingStoredCookies(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.toLowerCase().includes("no stored cookies");
+}
+
+async function loadEpisodeImages(detailId: number, episodeId: number) {
+  try {
+    const stored = await getStoredCookies();
+    return await fetchEpisodeImages(detailId, episodeId, stored.raw_cookie);
+  } catch (err) {
+    if (isMissingStoredCookies(err)) {
+      return fetchEpisodeImages(detailId, episodeId);
+    }
+    throw err;
+  }
+}
+
 export function MangaReaderPage({ detail, episode, onBack }: MangaReaderPageProps) {
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -85,9 +102,7 @@ export function MangaReaderPage({ detail, episode, onBack }: MangaReaderPageProp
 
     setLoading(true);
     setError(null);
-    getStoredCookies()
-      .then((stored) => fetchEpisodeImages(detail.id, episode.id, stored.raw_cookie))
-      .catch(() => fetchEpisodeImages(detail.id, episode.id))
+    loadEpisodeImages(detail.id, episode.id)
       .then((result) => {
         setImages(result.images);
         setView((current) => ({

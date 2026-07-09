@@ -17,6 +17,13 @@ describe("api failure descriptions", () => {
     });
   });
 
+  it("classifies missing stored cookies as a login problem", () => {
+    expect(describeApiFailure("No stored cookies found")).toMatchObject({
+      title: "需要重新登录",
+      kind: "login_required",
+    });
+  });
+
   it("keeps unknown failures concise", () => {
     expect(describeApiFailure("transport failed: dns error")).toMatchObject({
       title: "网络请求失败",
